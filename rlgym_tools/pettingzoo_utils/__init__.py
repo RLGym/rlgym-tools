@@ -1,1 +1,1 @@
-from pettingzoo_env import PettingZooEnv
+from .pettingzoo_env import PettingZooEnv
