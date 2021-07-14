@@ -10,7 +10,7 @@ __version__ = '1.0.0'
 release_notes = {
     '1.0.0': """
     Initial Release
-    - Tested with RLGym 0.4.1
+    - Tested with RLGym 0.5.0
     """
 }
 

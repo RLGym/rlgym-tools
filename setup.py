@@ -13,10 +13,10 @@ setup(
     description='Extra tools for RLGym, like SB3 compatibility',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    author='Rolv-Arild Braaten',
+    author='Rolv-Arild Braaten, Lucas Emery and Matthew Allen',
     url='https://rlgym.github.io',
     install_requires=[
-        'rlgym>=1.0',
+        'rlgym>=0.5.0',
     ],
     python_requires='>=3.7',
     license='Apache 2.0',

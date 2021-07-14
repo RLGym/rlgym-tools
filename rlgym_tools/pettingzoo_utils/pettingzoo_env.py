@@ -4,7 +4,7 @@ from pettingzoo import AECEnv
 from rlgym.gym import Gym
 
 
-class PettingZooWrapper(AECEnv):
+class PettingZooEnv(AECEnv):
     """
     Wrapper for using the RLGym env with PettingZoo,
     """

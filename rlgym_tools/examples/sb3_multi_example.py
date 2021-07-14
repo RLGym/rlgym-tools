@@ -1,0 +1,63 @@
+import numpy as np
+from stable_baselines3 import PPO
+from stable_baselines3.common.callbacks import CheckpointCallback
+from stable_baselines3.common.vec_env import VecMonitor, VecNormalize, VecCheckNan
+from stable_baselines3.ppo import MlpPolicy
+
+from rlgym.utils.obs_builders import AdvancedObs
+from rlgym.utils.reward_functions.common_rewards import VelocityPlayerToBallReward
+from rlgym.utils.terminal_conditions.common_conditions import TimeoutCondition, GoalScoredCondition
+from rlgym_tools.sb3_utils import SB3MultipleInstanceEnv
+from rlgym_tools.sb3_utils.sb3_multidiscrete_wrapper import SB3MultiDiscreteWrapper
+
+if __name__ == '__main__':
+    frame_skip = 4         # Number of ticks to repeat an action
+    half_life_seconds = 5  # Easier to conceptualize, after this many seconds the reward discount is 0.5
+
+    fps = 120 / frame_skip
+    gamma = np.exp(np.log(0.5) / (fps * half_life_seconds))  # Quick mafs
+    horizon = 2 * round(1 / (1 - gamma))  # Inspired by OpenAI Five
+    print(f"{fps=}, {gamma=}, {horizon=}")
+
+
+    def get_args():  # Need to use a function so that each instance can call it and produce their own objects
+        return dict(
+            team_size=3,  # 3v3 to get as many agents going as possible, will make results more noisy
+            tick_skip=frame_skip,
+            reward_function=VelocityPlayerToBallReward(),  # Simple reward since example code
+            self_play=True,
+            terminal_conditions=[TimeoutCondition(round(fps * 30)), GoalScoredCondition()],  # Some basic terminals
+            obs_builder=AdvancedObs()  # Not that advanced, good default
+        )
+
+
+    rl_path = r"C:\Program Files\Epic Games\rocketleague\Binaries\Win64\RocketLeague.exe"  # Path to Epic installation
+
+    env = SB3MultipleInstanceEnv(rl_path, 2, get_args)      # Start 2 instances, waiting 60 seconds between each
+    env = SB3MultiDiscreteWrapper(env)                      # Convert action space to multidiscrete
+    env = VecCheckNan(env)                                  # Optional
+    env = VecMonitor(env)                                   # Recommended, logs mean reward and ep_len to Tensorboard
+    env = VecNormalize(env, norm_obs=False, gamma=gamma)    # Highly recommended, normalizes rewards
+
+    # Hyperparameters presumably better than default; inspired by original PPO paper
+    model = PPO(
+        MlpPolicy,
+        env,
+        n_epochs=10,                 # PPO calls for multiple epochs, SB3 does early stopping to maintain target kl
+        target_kl=0.02 / 1.5,        # KL to aim for (divided by 1.5 because it's multiplied later for unknown reasons)
+        learning_rate=3e-4,          # https://twitter.com/karpathy/status/801621764144971776
+        ent_coef=0.01,               # From PPO Atari
+        vf_coef=1.,                  # From PPO Atari
+        gamma=gamma,                 # Gamma as calculated using half-life
+        verbose=3,                   # Print out all the info as we're going
+        batch_size=horizon,          # Batch size as high as possible within reason
+        n_steps=horizon,             # Number of steps to perform before optimizing network
+        tensorboard_log="out/logs",  # `tensorboard --logdir out/logs` in terminal to see graphs
+        device="auto"                # Uses GPU if available
+    )
+
+    # Save model every so often
+    # Divide by num_envs (number of agents) because callback only increments every time all agents have taken a step
+    callback = CheckpointCallback(round(1_000_000 / env.num_envs), "policy")
+
+    model.learn(100_000_000, callback=callback)

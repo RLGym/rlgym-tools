@@ -1,58 +1,22 @@
 import multiprocessing as mp
 import os
 import time
-from typing import Optional, List, Union, Sequence, Type, Any
+from typing import Optional, List, Union, Any
 
-import gym
 import numpy as np
-from stable_baselines3.common.vec_env import VecEnv, SubprocVecEnv
-from stable_baselines3.common.vec_env.base_vec_env import VecEnvIndices, VecEnvStepReturn, VecEnvObs, CloudpickleWrapper
+from stable_baselines3.common.vec_env import SubprocVecEnv, CloudpickleWrapper, VecEnv
+from stable_baselines3.common.vec_env.base_vec_env import VecEnvObs, VecEnvStepReturn, VecEnvIndices
 from stable_baselines3.common.vec_env.subproc_vec_env import _worker
 
 from rlgym.envs import Match
 from rlgym.gym import Gym
 
 
-class SB3SingleInstanceWrapper(VecEnv):
-    """
-    Class for wrapping a single env into a VecEnv (each car is treated as its own environment).
-    """
-    def __init__(self, env: Gym):
-        """
-        :param env: the environment to wrap.
-        """
-        super().__init__(env._match.agents, env.observation_space, env.action_space)
-        self.env = env
-        self.step_result = None
-
-    def reset(self) -> VecEnvObs:
-        return np.asarray(self.env.reset())
-
-    def step_async(self, actions: np.ndarray) -> None:
-        self.step_result = self.env.step(actions)
-
-    def step_wait(self) -> VecEnvStepReturn:
-        observations, rewards, done, info = self.step_result
-        return np.asarray(observations), np.array(rewards), np.full(len(rewards), done), [info] * len(rewards)
-
-    def close(self) -> None:
-        self.env.close()
-
-    def seed(self, seed: Optional[int] = None) -> List[Union[None, int]]:
-        return [self.env.seed(seed)] * self.num_envs
-
-    # Now a bunch of functions that need to be overridden to work, might have to implement later
-    def get_attr(self, attr_name: str, indices: VecEnvIndices = None) -> List[Any]: pass
-    def set_attr(self, attr_name: str, value: Any, indices: VecEnvIndices = None) -> None: pass
-    def env_method(self, method_name: str, *method_args, indices: VecEnvIndices = None, **method_kwargs) -> List[Any]: pass
-    def env_is_wrapped(self, wrapper_class: Type[gym.Wrapper], indices: VecEnvIndices = None) -> List[bool]: pass
-    def get_images(self) -> Sequence[np.ndarray]: pass
-
-
-class SB3MultipleInstanceWrapper(SubprocVecEnv):
+class SB3MultipleInstanceEnv(SubprocVecEnv):
     """
     Class for launching several Rocket League instances into a single SubprocVecEnv for use with Stable Baselines.
     """
+
     def __init__(self, path_to_epic_rl, num_instances, match_args_func, wait_time=60):
         """
         :param path_to_epic_rl: Path to the Rocket League executable of the Epic version.
@@ -61,6 +25,7 @@ class SB3MultipleInstanceWrapper(SubprocVecEnv):
                                 Needs to be a function so that each subprocess can call it and get their own objects.
         :param wait_time: the time to wait between launching each instance. Default one minute.
         """
+
         def spawn_process():
             match = Match(**match_args_func())
             env = Gym(match, pipe_id=os.getpid(), path_to_rl=path_to_epic_rl, use_injector=True)
@@ -135,4 +100,3 @@ class SB3MultipleInstanceWrapper(SubprocVecEnv):
         # Override to prevent out of bounds
         indices = self._get_indices(indices)
         return [self.remotes[i // self.n_agents_per_env] for i in indices]
-
