@@ -79,4 +79,4 @@ class PettingZooEnv(AECEnv):
 def parallel_pettingzoo_env(env: Gym):
     # Preliminary solution for making a ParallelEnv
     import supersuit as ss
-    return ss.to_parallel(PettingZooWrapper(env))
+    return ss.to_parallel(PettingZooEnv(env))

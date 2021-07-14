@@ -93,7 +93,7 @@ class SB3MultipleInstanceEnv(SubprocVecEnv):
         return np.asarray(obs), np.array(rews), np.array(dones), infos
 
     def seed(self, seed: Optional[int] = None) -> List[Union[None, int]]:
-        res = super(SB3MultipleInstanceWrapper, self).seed(seed)
+        res = super(SB3MultipleInstanceEnv, self).seed(seed)
         return [r for r in res for _ in range(self.n_agents_per_env)]
 
     def _get_target_remotes(self, indices: VecEnvIndices) -> List[Any]:
