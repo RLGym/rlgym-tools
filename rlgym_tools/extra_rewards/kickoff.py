@@ -43,7 +43,7 @@ class KickoffReward(RewardFunction):
     def __init__(self):
         super().__init__()
         self.vel_reward = DiffReward(VelocityPlayerToBallReward())
-        self.touch_reward = EventReward(touch=0.1)
+        self.touch_reward = EventReward(touch=1)
 
     def reset(self, initial_state: GameState):
         self.vel_reward.reset(initial_state)
@@ -54,19 +54,31 @@ class KickoffReward(RewardFunction):
         return self.vel_reward.get_reward(*args) + self.touch_reward.get_reward(*args)
 
     def get_final_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
-        rew = 0
-        for p in state.players:
-            if player.team_num == BLUE_TEAM:
-                ball_y = state.ball.position[1]
-                player_y = player.car_data.position[1]
-            else:
-                ball_y = state.inverted_ball.position[1]
-                player_y = player.inverted_car_data.position[1]
+        if player.team_num == BLUE_TEAM:
+            ball_y = state.ball.position[1]
+            player_y = player.car_data.position[1]
+        else:
+            ball_y = state.inverted_ball.position[1]
+            player_y = player.inverted_car_data.position[1]
 
-            if ball_y < player_y:
-                if p.team_num == player.team_num:
-                    rew -= 1
-                else:
-                    rew += 1
+        if ball_y < player_y:
+            return -10
 
-        return rew
+        return 0
+
+        # rew = 0
+        # for p in state.players:
+        #     if player.team_num == BLUE_TEAM:
+        #         ball_y = state.ball.position[1]
+        #         player_y = player.car_data.position[1]
+        #     else:
+        #         ball_y = state.inverted_ball.position[1]
+        #         player_y = player.inverted_car_data.position[1]
+        #
+        #     if ball_y < player_y:
+        #         if p.team_num == player.team_num:
+        #             rew -= 10
+        #         else:
+        #             rew += 1
+        #
+        # return rew
