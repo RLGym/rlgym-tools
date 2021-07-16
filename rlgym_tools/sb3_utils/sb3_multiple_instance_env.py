@@ -19,13 +19,20 @@ class SB3MultipleInstanceEnv(SubprocVecEnv):
     MEM_INSTANCE_LAUNCH = 3.5e9
     MEM_INSTANCE_LIM = 4e6
 
-    def __init__(self, path_to_epic_rl, num_instances, match_args_func, wait_time=60):
+    def __init__(self, path_to_epic_rl, num_instances, match_args_func, wait_time=60, force_paging=False):
         """
         :param path_to_epic_rl: Path to the Rocket League executable of the Epic version.
         :param num_instances: the number of Rocket League instances to start up.
         :param match_args_func: a function which produces the arguments for the Match object.
                                 Needs to be a function so that each subprocess can call it and get their own objects.
         :param wait_time: the time to wait between launching each instance. Default one minute.
+        :param force_paging: Enable forced paging of each spawned rocket league instance to reduce memory utilization
+                             immediately, instead of allowing the OS to slowly page untouched allocations.
+                             This will require you to potentially expand your Windows Page File, it may substantially
+                             increase disk activity, and it is highly recommended to have solid state storage setup
+                             as your paging disk.
+                             https://www.tomshardware.com/news/how-to-manage-virtual-memory-pagefile-windows-10,36929.html
+                             Default is off: OS dictates the behavior.
         """
         auto_instances = num_instances == "auto"
         if auto_instances:
@@ -40,7 +47,7 @@ class SB3MultipleInstanceEnv(SubprocVecEnv):
 
         def spawn_process():
             match = Match(**match_args_func())
-            env = Gym(match, pipe_id=os.getpid(), path_to_rl=path_to_epic_rl, use_injector=True)
+            env = Gym(match, pipe_id=os.getpid(), path_to_rl=path_to_epic_rl, use_injector=True, force_paging=force_paging)
             # env.reset()
             # while True:
             #     env.step(np.zeros((match.agents, 8)))
