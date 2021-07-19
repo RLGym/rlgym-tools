@@ -19,7 +19,7 @@ class AnnealRewards(RewardFunction):
     Example:
         AnnealRewards(rew1, 10_000, rew2, 100_000, rew3)
         will start by only rewarding rew1, then linearly transitions until 10_000 steps, where only rew2 is counted.
-        It then transitions between rew2 and rew3, and after 100_000 further steps, only rew3 is rewarded.
+        It then transitions between rew2 and rew3, and after 100_000 total steps and further, only rew3 is rewarded.
     """
     STEP = 0
     TOUCH = 1
