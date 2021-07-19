@@ -9,8 +9,12 @@ __version__ = '1.0.0'
 
 release_notes = {
     '1.0.0': """
-    Initial Release
-    - Tested with RLGym 0.5.0
+    - Added replay to rlgym GameState converter
+    - Moved SB3 environments from rlgym (now called SB3SingleInstanceEnv and SB3MultipleInstanceEnv) and fixed some bugs
+    - Added SB3MultiDiscreteWrapper, SB3DistributeRewardsWrapper and SB3LogReward 
+    - Added extra reward functions (DiffReward, DistributeRewards and MultiplyRewards)
+    - Added RLLibEnv
+    - Added working example code for SB3 and rllib
     """
 }
 

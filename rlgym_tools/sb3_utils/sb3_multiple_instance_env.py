@@ -1,7 +1,7 @@
 import multiprocessing as mp
 import os
 import time
-from typing import Optional, List, Union, Any
+from typing import Optional, List, Union, Any, Literal, Callable
 
 import numpy as np
 from stable_baselines3.common.vec_env import SubprocVecEnv, CloudpickleWrapper, VecEnv
@@ -19,11 +19,13 @@ class SB3MultipleInstanceEnv(SubprocVecEnv):
     MEM_INSTANCE_LAUNCH = 3.5e9
     MEM_INSTANCE_LIM = 4e6
 
-    def __init__(self, path_to_epic_rl, num_instances, match_args_func, wait_time=60, force_paging=False):
+    def __init__(self, path_to_epic_rl: str, num_instances: Union[int, Literal["auto"]],
+                 create_match_func: Callable[[], Match], wait_time: float = 60, force_paging: bool = False):
         """
         :param path_to_epic_rl: Path to the Rocket League executable of the Epic version.
-        :param num_instances: the number of Rocket League instances to start up.
-        :param match_args_func: a function which produces the arguments for the Match object.
+        :param num_instances: the number of Rocket League instances to start up,
+                              or "auto" to estimate how many instances are supported (requires psutil).
+        :param create_match_func: a function which produces the arguments for the Match object.
                                 Needs to be a function so that each subprocess can call it and get their own objects.
         :param wait_time: the time to wait between launching each instance. Default one minute.
         :param force_paging: Enable forced paging of each spawned rocket league instance to reduce memory utilization
@@ -46,14 +48,15 @@ class SB3MultipleInstanceEnv(SubprocVecEnv):
             num_instances = est_proc
 
         def spawn_process():
-            match = Match(**match_args_func())
-            env = Gym(match, pipe_id=os.getpid(), path_to_rl=path_to_epic_rl, use_injector=True, force_paging=force_paging)
+            match = create_match_func()
+            env = Gym(match, pipe_id=os.getpid(), path_to_rl=path_to_epic_rl,
+                      use_injector=True, force_paging=force_paging)
             # env.reset()
             # while True:
             #     env.step(np.zeros((match.agents, 8)))
             return env
 
-        match_args = match_args_func()
+        dummy_match = create_match_func()
 
         # super().__init__([])  Super init intentionally left out since we need to launch processes with delay
 
@@ -74,7 +77,6 @@ class SB3MultipleInstanceEnv(SubprocVecEnv):
         self.remotes, self.work_remotes = zip(*[ctx.Pipe() for _ in range(n_envs)])
         self.processes = []
         for work_remote, remote, env_fn in zip(self.work_remotes, self.remotes, env_fns):
-
             # if auto_instances:  # ADDED - Waiting for memory usage to go down
             #     while psutil.virtual_memory().free < self.MEM_INSTANCE_LAUNCH:  # noqa
             #         print("Memory usage too high, waiting 10 minutes...")
@@ -93,7 +95,7 @@ class SB3MultipleInstanceEnv(SubprocVecEnv):
         observation_space, action_space = self.remotes[0].recv()
         # END - Code from SubprocVecEnv class
 
-        self.n_agents_per_env = match_args.get("team_size") * (1 + match_args.get("self_play", False))
+        self.n_agents_per_env = dummy_match.agents
         self.num_envs = num_instances * self.n_agents_per_env
         VecEnv.__init__(self, self.num_envs, observation_space, action_space)
 

@@ -1,4 +1,5 @@
 import numpy as np
+from rlgym.envs import Match
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import VecMonitor, VecNormalize, VecCheckNan
@@ -10,9 +11,9 @@ from rlgym.utils.terminal_conditions.common_conditions import TimeoutCondition, 
 from rlgym_tools.sb3_utils import SB3MultipleInstanceEnv
 from rlgym_tools.sb3_utils.sb3_multidiscrete_wrapper import SB3MultiDiscreteWrapper
 
-if __name__ == '__main__':
-    frame_skip = 4         # Number of ticks to repeat an action
-    half_life_seconds = 5  # Easier to conceptualize, after this many seconds the reward discount is 0.5
+if __name__ == '__main__':  # Required for multiprocessing
+    frame_skip = 4          # Number of ticks to repeat an action
+    half_life_seconds = 5   # Easier to conceptualize, after this many seconds the reward discount is 0.5
 
     fps = 120 / frame_skip
     gamma = np.exp(np.log(0.5) / (fps * half_life_seconds))  # Quick mafs
@@ -20,8 +21,8 @@ if __name__ == '__main__':
     print(f"{fps=}, {gamma=}, {horizon=}")
 
 
-    def get_args():  # Need to use a function so that each instance can call it and produce their own objects
-        return dict(
+    def get_match():  # Need to use a function so that each instance can call it and produce their own objects
+        return Match(
             team_size=3,  # 3v3 to get as many agents going as possible, will make results more noisy
             tick_skip=frame_skip,
             reward_function=VelocityPlayerToBallReward(),  # Simple reward since example code
@@ -33,7 +34,7 @@ if __name__ == '__main__':
 
     rl_path = r"C:\Program Files\Epic Games\rocketleague\Binaries\Win64\RocketLeague.exe"  # Path to Epic installation
 
-    env = SB3MultipleInstanceEnv(rl_path, 2, get_args)      # Start 2 instances, waiting 60 seconds between each
+    env = SB3MultipleInstanceEnv(rl_path, 2, get_match)     # Start 2 instances, waiting 60 seconds between each
     env = SB3MultiDiscreteWrapper(env)                      # Convert action space to multidiscrete
     env = VecCheckNan(env)                                  # Optional
     env = VecMonitor(env)                                   # Recommended, logs mean reward and ep_len to Tensorboard
