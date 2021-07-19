@@ -30,9 +30,9 @@ class SB3MultipleInstanceEnv(SubprocVecEnv):
         :param wait_time: the time to wait between launching each instance. Default one minute.
         :param force_paging: Enable forced paging of each spawned rocket league instance to reduce memory utilization
                              immediately, instead of allowing the OS to slowly page untouched allocations.
-                             This will require you to potentially expand your Windows Page File, it may substantially
-                             increase disk activity, and it is highly recommended to have solid state storage setup
-                             as your paging disk.
+                             WARNING: This will require you to potentially expand your Windows Page File, and it may
+                             substantially increase disk activity, leading to decreased disk lifetime.
+                             Use at your own peril.
                              https://www.tomshardware.com/news/how-to-manage-virtual-memory-pagefile-windows-10,36929.html
                              Default is off: OS dictates the behavior.
         """
