@@ -5,16 +5,22 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '1.0.0'
+__version__ = '1.1.0'
 
 release_notes = {
+    '1.1.0': """
+    - Added functionality in SB3MultipleInstanceEnv to take multiple match objects (one for each instance).
+    - Added AnnealRewards for transitioning between reward functions.
+    - Added granularity option to SB3MultiDiscreteWrapper.
+    - Added negative slope parameter to DiffReward (negative values are multiplied by this).
+    """,
     '1.0.0': """
     - Added replay to rlgym GameState converter
     - Moved SB3 environments from rlgym (now called SB3SingleInstanceEnv and SB3MultipleInstanceEnv) and fixed some bugs
     - Added SB3MultiDiscreteWrapper, SB3DistributeRewardsWrapper and SB3LogReward 
     - Added extra reward functions (DiffReward, DistributeRewards and MultiplyRewards)
     - Added RLLibEnv
-    - Added working example code for SB3 and rllib
+    - Added working example code for SB3 and RLlib
     """
 }
 
