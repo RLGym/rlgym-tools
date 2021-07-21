@@ -8,12 +8,11 @@
 
 name: Upload Python Package
 
-on:
-  release:
-    types: [published]
+on: [push]
 
 jobs:
   deploy:
+    if: startsWith(github.ref, 'refs/tags/v')
 
     runs-on: windows-latest
 
