@@ -8,16 +8,18 @@ class SB3MultiDiscreteWrapper(VecEnvWrapper):
     """
     Simply converts env such that action space is MultiDiscrete instead of Box (basically KBM).
     """
-    def __init__(self, venv: VecEnv):
+    def __init__(self, venv: VecEnv, n=3):
         super().__init__(venv)
-        self.action_space = MultiDiscrete((3, 3, 3, 3, 3, 2, 2, 2))  # TODO allow for more granular outputs
+        assert n % 2 == 1
+        self.action_space = MultiDiscrete((n, n, n, n, n, 2, 2, 2))
+        self.n = n
 
     def reset(self) -> VecEnvObs:
         return self.venv.reset()
 
     def step_async(self, actions: np.ndarray) -> None:
         actions = np.copy(actions)
-        actions[..., :5] -= 1
+        actions[..., :5] = 2 * actions[..., :5] / (self.n - 1) - 1
         self.venv.step_async(actions)
 
     def step_wait(self) -> VecEnvStepReturn:

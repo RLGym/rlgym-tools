@@ -14,7 +14,7 @@ class DistributeRewards(RewardFunction):
             - Opponents get -33.3 each
 
     Note that this will bring mean reward close to zero, so tracking might be misleading.
-    If using one of the SB3 envs SB3DistributeRewardsWrapper is an alternative
+    If using one of the SB3 envs SB3DistributeRewardsWrapper can be used after logging.
     """
     def __init__(self, reward_func: RewardFunction, team_spirit=0.3):
         super().__init__()
@@ -45,8 +45,8 @@ class DistributeRewards(RewardFunction):
                 else:
                     sum_orange += rew
                     n_orange += 1
-            self.avg_blue = sum_blue / n_blue
-            self.avg_orange = sum_orange / n_orange
+            self.avg_blue = sum_blue / (n_blue or 1)
+            self.avg_orange = sum_orange / (n_orange or 1)
 
             self.last_state = state
 

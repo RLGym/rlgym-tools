@@ -12,7 +12,7 @@ from rlgym_tools.sb3_utils import SB3MultipleInstanceEnv
 from rlgym_tools.sb3_utils.sb3_multidiscrete_wrapper import SB3MultiDiscreteWrapper
 
 if __name__ == '__main__':  # Required for multiprocessing
-    frame_skip = 4          # Number of ticks to repeat an action
+    frame_skip = 8          # Number of ticks to repeat an action
     half_life_seconds = 5   # Easier to conceptualize, after this many seconds the reward discount is 0.5
 
     fps = 120 / frame_skip
@@ -34,7 +34,7 @@ if __name__ == '__main__':  # Required for multiprocessing
 
     rl_path = r"C:\Program Files\Epic Games\rocketleague\Binaries\Win64\RocketLeague.exe"  # Path to Epic installation
 
-    env = SB3MultipleInstanceEnv(rl_path, 2, get_match)     # Start 2 instances, waiting 60 seconds between each
+    env = SB3MultipleInstanceEnv(rl_path, get_match, 2)     # Start 2 instances, waiting 60 seconds between each
     env = SB3MultiDiscreteWrapper(env)                      # Convert action space to multidiscrete
     env = VecCheckNan(env)                                  # Optional
     env = VecMonitor(env)                                   # Recommended, logs mean reward and ep_len to Tensorboard
@@ -46,7 +46,7 @@ if __name__ == '__main__':  # Required for multiprocessing
         env,
         n_epochs=10,                 # PPO calls for multiple epochs, SB3 does early stopping to maintain target kl
         target_kl=0.02 / 1.5,        # KL to aim for (divided by 1.5 because it's multiplied later for unknown reasons)
-        learning_rate=3e-4,          # https://twitter.com/karpathy/status/801621764144971776
+        learning_rate=3e-5,          # Around this is fairly common for PPO
         ent_coef=0.01,               # From PPO Atari
         vf_coef=1.,                  # From PPO Atari
         gamma=gamma,                 # Gamma as calculated using half-life

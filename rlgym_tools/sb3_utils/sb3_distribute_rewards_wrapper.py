@@ -1,3 +1,4 @@
+import numpy as np
 from stable_baselines3.common.vec_env import VecEnvWrapper, VecEnv
 from stable_baselines3.common.vec_env.base_vec_env import VecEnvObs, VecEnvStepReturn
 
@@ -33,7 +34,7 @@ class SB3DistributeRewardsWrapper(VecEnvWrapper):
                 for team, opp in (blue_indices, orange_indices), (orange_indices, blue_indices):
                     rewards[team] = (1 - self.team_spirit) * rewards[team] \
                                     + self.team_spirit * rewards[team].mean() \
-                                    - rewards[opp].mean()
+                                    - np.nan_to_num(rewards[opp].mean())  # In case of no opponent
 
                 last_state = state
 
