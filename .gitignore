@@ -3,5 +3,5 @@
 __pycache__
 build
 dist
-rlgym.egg-info
+rlgym_tools.egg-info
 testenv
