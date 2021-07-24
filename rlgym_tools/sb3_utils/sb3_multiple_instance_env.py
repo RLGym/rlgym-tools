@@ -1,7 +1,7 @@
 import multiprocessing as mp
 import os
 import time
-from typing import Optional, List, Union, Any, Literal, Callable, Sequence
+from typing import Optional, List, Union, Any, Callable, Sequence
 
 import numpy as np
 from stable_baselines3.common.vec_env import SubprocVecEnv, CloudpickleWrapper, VecEnv
