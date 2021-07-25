@@ -18,7 +18,7 @@ if __name__ == '__main__':  # Required for multiprocessing
     fps = 120 / frame_skip
     gamma = np.exp(np.log(0.5) / (fps * half_life_seconds))  # Quick mafs
     horizon = 2 * round(1 / (1 - gamma))  # Inspired by OpenAI Five
-    print(f"{fps=}, {gamma=}, {horizon=}")
+    print(f"fps={fps}, gamma={gamma}, horizon={horizon}")
 
 
     def get_match():  # Need to use a function so that each instance can call it and produce their own objects
