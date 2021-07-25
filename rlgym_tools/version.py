@@ -5,9 +5,13 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '1.1.1'
+__version__ = '1.1.2'
 
 release_notes = {
+    '1.1.2':
+    """
+    - Fix version import (was absolute, now relative)
+    """,
     '1.1.1':
     """
     - Fixed an invalid Python 3.7 import
