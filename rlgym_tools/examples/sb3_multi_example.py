@@ -59,6 +59,15 @@ if __name__ == '__main__':  # Required for multiprocessing
 
     # Save model every so often
     # Divide by num_envs (number of agents) because callback only increments every time all agents have taken a step
-    callback = CheckpointCallback(round(1_000_000 / env.num_envs), "policy")
+    # This saves to specified folder with a specified name
+    callback = CheckpointCallback(round(1_000_000 / env.num_envs), save_path="policy", name_prefix="rl_model")
 
     model.learn(100_000_000, callback=callback)
+
+    # Now, if one wants to load a trained model from a checkpoint, use this function
+    # This will contain all the attributes of the original model
+    # Any attribute can be overwritten by using the custom_objects parameter,
+    # which includes n_envs (number of agents), which has to be overwritten to use a different amount
+    model = PPO.load("policy/rl_model_1000002_steps.zip", env, custom_objects=dict(n_envs=2))
+    # Use reset_num_timesteps=False to keep going with same logger/checkpoints
+    model.learn(100_000_000, callback=callback, reset_num_timesteps=False)
