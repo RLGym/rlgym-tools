@@ -11,7 +11,7 @@ release_notes = {
     '1.1.3':
     """
     - Fix RLGym 1.0 incompatibility
-    """
+    """,
     '1.1.2':
     """
     - Fix version import (was absolute, now relative)
