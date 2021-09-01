@@ -42,6 +42,7 @@ class SB3MultipleInstanceEnv(SubprocVecEnv):
         self,
         match_func_or_matches: Union[Callable[[], Match], Sequence[Match]],
         num_instances: Optional[int] = None,
+        rl_path: Optional[str] = None,
         wait_time: float = 60,
         force_paging: bool = False,
     ):
@@ -75,6 +76,7 @@ class SB3MultipleInstanceEnv(SubprocVecEnv):
                 match = match_func_or_matches[i]
                 env = Gym(
                     match,
+                    launch_preference=rl_path,
                     pipe_id=os.getpid(),
                     use_injector=True,
                     force_paging=force_paging,
