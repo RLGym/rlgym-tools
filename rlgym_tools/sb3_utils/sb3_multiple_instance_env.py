@@ -5,7 +5,11 @@ from typing import Optional, List, Union, Any, Callable, Sequence
 
 import numpy as np
 from stable_baselines3.common.vec_env import SubprocVecEnv, CloudpickleWrapper, VecEnv
-from stable_baselines3.common.vec_env.base_vec_env import VecEnvObs, VecEnvStepReturn, VecEnvIndices
+from stable_baselines3.common.vec_env.base_vec_env import (
+    VecEnvObs,
+    VecEnvStepReturn,
+    VecEnvIndices,
+)
 from stable_baselines3.common.vec_env.subproc_vec_env import _worker
 
 from rlgym.envs import Match
@@ -16,24 +20,32 @@ class SB3MultipleInstanceEnv(SubprocVecEnv):
     """
     Class for launching several Rocket League instances into a single SubprocVecEnv for use with Stable Baselines.
     """
+
     MEM_INSTANCE_LAUNCH = 3.5e9
     MEM_INSTANCE_LIM = 4e6
 
     @staticmethod
     def estimate_supported_processes():
         import psutil
+
         vm = psutil.virtual_memory()
         # Need 3.5GB to launch, reduces to 350MB after a while
-        est_proc_mem = round((vm.available - SB3MultipleInstanceEnv.MEM_INSTANCE_LAUNCH)
-                             / SB3MultipleInstanceEnv.MEM_INSTANCE_LAUNCH)
+        est_proc_mem = round(
+            (vm.available - SB3MultipleInstanceEnv.MEM_INSTANCE_LAUNCH)
+            / SB3MultipleInstanceEnv.MEM_INSTANCE_LAUNCH
+        )
         est_proc_cpu = os.cpu_count()
         est_proc = min(est_proc_mem, est_proc_cpu)
         return est_proc
 
-    def __init__(self, path_to_epic_rl: str, match_func_or_matches: Union[Callable[[], Match], Sequence[Match]],
-                 num_instances: Optional[int] = None, wait_time: float = 60, force_paging: bool = False):
+    def __init__(
+        self,
+        match_func_or_matches: Union[Callable[[], Match], Sequence[Match]],
+        num_instances: Optional[int] = None,
+        wait_time: float = 60,
+        force_paging: bool = False,
+    ):
         """
-        :param path_to_epic_rl: path to the Rocket League executable of the Epic version.
         :param match_func_or_matches: either a function which produces the a Match object, or a list of Match objects.
                                 Needs to be a function so that each subprocess can call it and get their own objects.
         :param num_instances: the number of Rocket League instances to start up,
@@ -48,17 +60,25 @@ class SB3MultipleInstanceEnv(SubprocVecEnv):
                              Default is off: OS dictates the behavior.
         """
         if callable(match_func_or_matches):
-            assert num_instances is not None, "If using a function to generate Match objects, " \
-                                              "num_instances must be specified"
+            assert num_instances is not None, (
+                "If using a function to generate Match objects, "
+                "num_instances must be specified"
+            )
             if num_instances == "auto":
                 num_instances = SB3MultipleInstanceEnv.estimate_supported_processes()
-            match_func_or_matches = [match_func_or_matches() for _ in range(num_instances)]
+            match_func_or_matches = [
+                match_func_or_matches() for _ in range(num_instances)
+            ]
 
         def get_process_func(i):
             def spawn_process():
                 match = match_func_or_matches[i]
-                env = Gym(match, pipe_id=os.getpid(), path_to_rl=path_to_epic_rl,
-                          use_injector=True, force_paging=force_paging)
+                env = Gym(
+                    match,
+                    pipe_id=os.getpid(),
+                    use_injector=True,
+                    force_paging=force_paging,
+                )
                 return env
 
             return spawn_process
@@ -81,15 +101,21 @@ class SB3MultipleInstanceEnv(SubprocVecEnv):
 
         self.remotes, self.work_remotes = zip(*[ctx.Pipe() for _ in range(n_envs)])
         self.processes = []
-        for work_remote, remote, env_fn in zip(self.work_remotes, self.remotes, env_fns):
+        for work_remote, remote, env_fn in zip(
+            self.work_remotes, self.remotes, env_fns
+        ):
             args = (work_remote, remote, CloudpickleWrapper(env_fn))
             # daemon=True: if the main process crashes, we should not cause things to hang
-            process = ctx.Process(target=_worker, args=args, daemon=True)  # pytype:disable=attribute-error
+            process = ctx.Process(
+                target=_worker, args=args, daemon=True
+            )  # pytype:disable=attribute-error
             process.start()
             self.processes.append(process)
             work_remote.close()
 
-            time.sleep(wait_time)  # ADDED - Waits between starting Rocket League instances
+            time.sleep(
+                wait_time
+            )  # ADDED - Waits between starting Rocket League instances
 
         self.remotes[0].send(("get_spaces", None))
         observation_space, action_space = self.remotes[0].recv()
@@ -115,7 +141,7 @@ class SB3MultipleInstanceEnv(SubprocVecEnv):
     def step_async(self, actions: np.ndarray) -> None:
         i = 0
         for remote, n_agents in zip(self.remotes, self.n_agents_per_env):
-            remote.send(("step", actions[i: i + n_agents, :]))
+            remote.send(("step", actions[i : i + n_agents, :]))
             i += n_agents
         self.waiting = True
 
@@ -137,7 +163,12 @@ class SB3MultipleInstanceEnv(SubprocVecEnv):
                 flat_dones += [done] * n_agents
                 flat_infos += [info] * n_agents
         self.waiting = False
-        return np.asarray(flat_obs), np.array(flat_rews), np.array(flat_dones), flat_infos
+        return (
+            np.asarray(flat_obs),
+            np.array(flat_rews),
+            np.array(flat_dones),
+            flat_infos,
+        )
 
     def seed(self, seed: Optional[int] = None) -> List[Union[None, int]]:
         res = super(SB3MultipleInstanceEnv, self).seed(seed)
