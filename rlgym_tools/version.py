@@ -5,9 +5,13 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '1.1.3'
+__version__ = '1.1.4'
 
 release_notes = {
+    '1.1.4':
+    """
+    - Bug fixes for AdvancedStacker
+    """,
     '1.1.3':
     """
     - Fix RLGym 1.0 incompatibility
