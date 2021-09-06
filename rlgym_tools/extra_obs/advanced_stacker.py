@@ -14,26 +14,27 @@ class AdvancedStacker(ObsBuilder):
         self.VEL_STD = 3000
         self.ANG_STD = 5.5
         self.default_action = [0, 0, 0, 0, 0, 0, 0, 0]
-        self.stack_size = 10
-        self.action_stack = deque([], maxlen=self.stack_size)
-        self.blank_stack()
+        self.stack_size = 15
+        self.action_stack = [deque([], maxlen=self.stack_size) for _ in range(66)]
+        for i in range(len(self.action_stack)):
+            self.blank_stack(i)
 
-    def blank_stack(self) -> None:
-        self.action_stack.clear()
+    def blank_stack(self, index: int) -> None:
         for i in range(self.stack_size):
-            self.action_stack.appendleft(self.default_action)
+            self.action_stack[index].appendleft(self.default_action)
 
-    def add_action_to_stack(self, new_action: np.ndarray):
-        self.action_stack.appendleft(new_action)
+    def add_action_to_stack(self, new_action: np.ndarray, index: int):
+        self.action_stack[index].appendleft(new_action)
 
     def reset(self, initial_state: GameState):
-        self.blank_stack()
+        for p in initial_state.players:
+            self.blank_stack(p.car_id)
 
     def build_obs(
         self, player: PlayerData, state: GameState, previous_action: np.ndarray
     ) -> Any:
 
-        self.add_action_to_stack(previous_action)
+        self.add_action_to_stack(previous_action, player.car_id)
 
         if player.team_num == common_values.ORANGE_TEAM:
             inverted = True
@@ -52,7 +53,7 @@ class AdvancedStacker(ObsBuilder):
             pads,
         ]
 
-        obs.extend(list(self.action_stack))
+        obs.extend(list(self.action_stack[player.car_id]))
 
         player_car = self._add_player_to_obs(obs, player, ball, inverted)
 
