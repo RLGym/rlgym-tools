@@ -74,14 +74,10 @@ class SB3MultipleInstanceEnv(SubprocVecEnv):
         def get_process_func(i):
             def spawn_process():
                 match = match_func_or_matches[i]
-                env = Gym(
-                    match,
-                    launch_preference=rl_path,
-                    pipe_id=os.getpid(),
-                    use_injector=True,
-                    force_paging=force_paging,
-                )
-                return env
+                kwargs = dict(match=match, pipe_id=os.getpid(), use_injector=True, force_paging=force_paging)
+                if rl_path is not None:
+                    kwargs["launch_preference"] = rl_path
+                return Gym(**kwargs)
 
             return spawn_process
 
