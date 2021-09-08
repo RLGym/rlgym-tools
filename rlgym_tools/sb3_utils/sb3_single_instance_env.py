@@ -22,19 +22,31 @@ class SB3SingleInstanceEnv(VecEnv):
         self.step_result = None
 
     def reset(self) -> VecEnvObs:
-        return np.asarray(self.env.reset())
+        observations = self.env.reset()
+        if len(np.shape(observations)) == 1:
+            observations = [observations]
+        return np.asarray(observations)
 
     def step_async(self, actions: np.ndarray) -> None:
         self.step_result = self.env.step(actions)
 
     def step_wait(self) -> VecEnvStepReturn:
         observations, rewards, done, info = self.step_result
+
+        if type(rewards) not in (tuple, list, np.ndarray):
+            rewards = [rewards]
+            observations = [observations]
+
         if done:
             # Following what SubprocVecEnv does
-            infos = [info.copy() for _ in range(len(rewards))]
+            infos = [info] * len(rewards)
             for info, obs in zip(infos, observations):
                 info["terminal_observation"] = obs
+
             observations = self.env.reset()
+            if len(np.shape(observations)) == 1:
+                observations = [observations]
+
         else:
             infos = [info] * len(rewards)
         return np.asarray(observations), np.array(rewards), np.full(len(rewards), done), infos
