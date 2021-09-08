@@ -74,10 +74,13 @@ class SB3MultipleInstanceEnv(SubprocVecEnv):
         def get_process_func(i):
             def spawn_process():
                 match = match_func_or_matches[i]
-                kwargs = dict(match=match, pipe_id=os.getpid(), use_injector=True, force_paging=force_paging)
-                if rl_path is not None:
-                    kwargs["launch_preference"] = rl_path
-                return Gym(**kwargs)
+                env = Gym(
+                    match,
+                    pipe_id=os.getpid(),
+                    use_injector=True,
+                    force_paging=force_paging,
+                )
+                return env
 
             return spawn_process
 
@@ -111,9 +114,8 @@ class SB3MultipleInstanceEnv(SubprocVecEnv):
             self.processes.append(process)
             work_remote.close()
 
-            time.sleep(
-                wait_time
-            )  # ADDED - Waits between starting Rocket League instances
+            if len(self.processes) != len(env_fns):
+                time.sleep(wait_time)  # ADDED - Waits between starting Rocket League instances
 
         self.remotes[0].send(("get_spaces", None))
         observation_space, action_space = self.remotes[0].recv()
