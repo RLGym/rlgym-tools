@@ -7,11 +7,13 @@ from collections import deque
 
 
 class AdvancedStacker(ObsBuilder):
-    '''
-    Alternative observation to AdvancedObs that stacks AdvancedObs of the same info as in AdvancedObs and also actions that led into those observations.
+    """
+    Alternative observation to AdvancedObs that stacks AdvancedObs of the same info as in AdvancedObs and also actions
+    that led into those observations.
 
-    :param stack_size: Number of frames to stack
-    '''
+    :param stack_size: number of frames to stack
+    """
+
     def __init__(self, stack_size: int = 15):
         super().__init__()
         self.POS_STD = 6000
@@ -34,10 +36,7 @@ class AdvancedStacker(ObsBuilder):
         for p in initial_state.players:
             self.blank_stack(p.car_id)
 
-    def build_obs(
-            self, player: PlayerData, state: GameState, previous_action: np.ndarray
-    ) -> Any:
-
+    def build_obs(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> Any:
         self.add_action_to_stack(previous_action, player.car_id)
 
         if player.team_num == common_values.ORANGE_TEAM:
@@ -88,9 +87,7 @@ class AdvancedStacker(ObsBuilder):
         obs.extend(enemies)
         return np.concatenate(obs)
 
-    def _add_player_to_obs(
-            self, obs: List, player: PlayerData, ball: PhysicsObject, inverted: bool
-    ):
+    def _add_player_to_obs(self, obs: List, player: PlayerData, ball: PhysicsObject, inverted: bool):
         if inverted:
             player_car = player.inverted_car_data
         else:
