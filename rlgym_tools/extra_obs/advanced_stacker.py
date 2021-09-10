@@ -1,4 +1,3 @@
-import math
 import numpy as np
 from typing import Any, List
 from rlgym.utils import common_values
@@ -8,19 +7,24 @@ from collections import deque
 
 
 class AdvancedStacker(ObsBuilder):
-    def __init__(self):
+    '''
+    Alternative observation to AdvancedObs that stacks AdvancedObs of the same info as in AdvancedObs and also actions that led into those observations.
+
+    :param stack_size: Number of frames to stack
+    '''
+    def __init__(self, stack_size: int = 15):
         super().__init__()
         self.POS_STD = 6000
         self.VEL_STD = 3000
         self.ANG_STD = 5.5
         self.default_action = [0, 0, 0, 0, 0, 0, 0, 0]
-        self.stack_size = 15
+        self.stack_size = stack_size
         self.action_stack = [deque([], maxlen=self.stack_size) for _ in range(66)]
         for i in range(len(self.action_stack)):
             self.blank_stack(i)
 
     def blank_stack(self, index: int) -> None:
-        for i in range(self.stack_size):
+        for _ in range(self.stack_size):
             self.action_stack[index].appendleft(self.default_action)
 
     def add_action_to_stack(self, new_action: np.ndarray, index: int):
@@ -31,7 +35,7 @@ class AdvancedStacker(ObsBuilder):
             self.blank_stack(p.car_id)
 
     def build_obs(
-        self, player: PlayerData, state: GameState, previous_action: np.ndarray
+            self, player: PlayerData, state: GameState, previous_action: np.ndarray
     ) -> Any:
 
         self.add_action_to_stack(previous_action, player.car_id)
@@ -85,7 +89,7 @@ class AdvancedStacker(ObsBuilder):
         return np.concatenate(obs)
 
     def _add_player_to_obs(
-        self, obs: List, player: PlayerData, ball: PhysicsObject, inverted: bool
+            self, obs: List, player: PlayerData, ball: PhysicsObject, inverted: bool
     ):
         if inverted:
             player_car = player.inverted_car_data
