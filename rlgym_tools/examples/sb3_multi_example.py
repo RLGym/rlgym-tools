@@ -65,7 +65,7 @@ if __name__ == '__main__':  # Required for multiprocessing
     # This will contain all the attributes of the original model
     # Any attribute can be overwritten by using the custom_objects parameter,
     # which includes n_envs (number of agents), which has to be overwritten to use a different amount
-    model = PPO.load("policy/rl_model_1000002_steps.zip", env, custom_objects=dict(n_envs=6))
+    model = PPO.load("policy/rl_model_1000002_steps.zip", env, custom_objects=dict(n_envs=env.num_envs))
     env.reset()  # Important when loading models, SB3 does not do this for you
     # Use reset_num_timesteps=False to keep going with same logger/checkpoints
     model.learn(100_000_000, callback=callback, reset_num_timesteps=False)
