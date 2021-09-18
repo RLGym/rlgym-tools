@@ -5,11 +5,14 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '1.1.5'
+__version__ = '1.2.0'
 
 release_notes = {
-    '1.1.5':
+    '1.2.0':
     """
+    - Added multi-model support for SB3
+    - Added weighted sample setter
+    - Added general stacker
     - Various bug fixes
     """,
     '1.1.4':
