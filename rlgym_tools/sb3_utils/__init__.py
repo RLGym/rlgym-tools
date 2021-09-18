@@ -3,3 +3,4 @@ from .sb3_log_reward import SB3LogReward
 from .sb3_multidiscrete_wrapper import SB3MultiDiscreteWrapper
 from .sb3_multiple_instance_env import SB3MultipleInstanceEnv
 from .sb3_single_instance_env import SB3SingleInstanceEnv
+from .sb3_multi_agent_tools import multi_learn
