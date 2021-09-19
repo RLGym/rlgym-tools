@@ -14,7 +14,7 @@ from stable_baselines3.common.vec_env.subproc_vec_env import _worker
 
 from rlgym.envs import Match
 from rlgym.gym import Gym
-
+from rlgym.gamelaunch import LaunchPreference
 
 class SB3MultipleInstanceEnv(SubprocVecEnv):
     """
@@ -42,7 +42,7 @@ class SB3MultipleInstanceEnv(SubprocVecEnv):
         self,
         match_func_or_matches: Union[Callable[[], Match], Sequence[Match]],
         num_instances: Optional[int] = None,
-        rl_path: Optional[str] = None,
+        launch_preference: Optional[Union[LaunchPreference, str]] = LaunchPreference.EPIC,
         wait_time: float = 60,
         force_paging: bool = False,
     ):
@@ -77,6 +77,7 @@ class SB3MultipleInstanceEnv(SubprocVecEnv):
                 env = Gym(
                     match,
                     pipe_id=os.getpid(),
+                    launch_preference=launch_preference,
                     use_injector=True,
                     force_paging=force_paging,
                 )
