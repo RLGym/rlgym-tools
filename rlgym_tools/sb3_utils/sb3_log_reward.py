@@ -146,4 +146,4 @@ class SB3CombinedLogRewardCallback(BaseCallback):
 
         # log each reward
         for n, name in enumerate(names):
-            self.model.logger.record('rewards/'+name, np.mean(returns[:, n]))
+            self.model.logger.record_mean('rewards/'+name, np.mean(returns[:, n]))
