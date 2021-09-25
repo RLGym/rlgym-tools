@@ -5,9 +5,16 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '1.2.0'
+__version__ = '1.3.0'
 
 release_notes = {
+    '1.3.0': 
+    """
+    - Add KickoffReward (Impossibum)
+    - Add SequentialReward (Impossibum)
+    - Better individual reward logging for SB3 (LuminousLamp)
+    - Add launch_preference as parameter to SB3MultipleInstanceEnv
+    """,
     '1.2.0':
     """
     - Added multi-model support for SB3
