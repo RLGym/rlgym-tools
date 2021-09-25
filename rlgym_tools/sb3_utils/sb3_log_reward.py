@@ -139,6 +139,9 @@ class SB3CombinedLogRewardCallback(BaseCallback):
                     for line in f:
                         if line != '\n':
                             returns.append(eval(line.strip()))
+                # empty the file ready for the next rollout
+                with open('bin/combinedlogfiles/'+file, 'w') as f:
+                    f.write('') 
 
         returns = np.array(returns)
         # use as many names as provided, then call them by their index after that
