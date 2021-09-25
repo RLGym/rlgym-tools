@@ -18,7 +18,7 @@ class SB3MultiDiscreteWrapper(VecEnvWrapper):
         return self.venv.reset()
 
     def step_async(self, actions: np.ndarray) -> None:
-        actions = np.copy(actions)
+        actions = np.array(actions, copy=True)
         actions[..., :5] = 2 * actions[..., :5] / (self.n - 1) - 1
         self.venv.step_async(actions)
 
