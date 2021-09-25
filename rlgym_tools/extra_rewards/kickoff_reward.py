@@ -1,10 +1,11 @@
 from rlgym.utils.reward_functions import RewardFunction
 from rlgym.utils.reward_functions.common_rewards.player_ball_rewards import VelocityPlayerToBallReward
 
+
+class KickoffReward(RewardFunction):
 """
 a simple reward that encourages driving towards the ball fast while it's in the neutral kickoff position
 """
-class KickoffReward(RewardFunction):
     def __init__(self):
         super().__init__()
         self.vel_dir_reward = VelocityPlayerToBallReward()
