@@ -3,9 +3,9 @@ from rlgym.utils.reward_functions.common_rewards.player_ball_rewards import Velo
 
 
 class KickoffReward(RewardFunction):
-"""
-a simple reward that encourages driving towards the ball fast while it's in the neutral kickoff position
-"""
+    """
+    a simple reward that encourages driving towards the ball fast while it's in the neutral kickoff position
+    """
     def __init__(self):
         super().__init__()
         self.vel_dir_reward = VelocityPlayerToBallReward()
