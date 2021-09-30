@@ -67,6 +67,8 @@ class SB3CombinedLogReward(CombinedReward):
 
         :param reward_functions: Each individual reward function.
         :param reward_weights: The weights for each reward.
+        :param file_location: The path to the directory that will be used to
+        transfer reward info
         """
         super().__init__(reward_functions, reward_weights)
 
@@ -158,6 +160,8 @@ class SB3CombinedLogRewardCallback(BaseCallback):
 
         :param reward_names: List of names that the logger will use for
         each reward.
+        :param file_location: The path to the directory that will be used to
+        transfer reward info
         """
         super().__init__()
         self.reward_names = reward_names
