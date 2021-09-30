@@ -1,3 +1,4 @@
+import json
 import os
 from typing import Tuple, Optional, List
 
@@ -13,6 +14,7 @@ class SB3LogReward(RewardFunction):
     """
     Simple reward function for logging individual rewards to a custom Logger.
     """
+
     def __init__(self, logger: Logger, reward_function: RewardFunction):
         super().__init__()
         self.logger = logger
@@ -48,14 +50,14 @@ class SB3LogReward(RewardFunction):
         self.episode_steps += 1
         return rew
 
-class SB3CombinedLogReward(CombinedReward):
 
-    index_tracker = 0 # So we can uniquely identify each instance
+class SB3CombinedLogReward(CombinedReward):
 
     def __init__(
             self,
             reward_functions: Tuple[RewardFunction, ...],
-            reward_weights: Optional[Tuple[float, ...]] = None
+            reward_weights: Optional[Tuple[float, ...]] = None,
+            file_location: str = 'combinedlogfiles'
     ):
         """
         Creates the combined reward using multiple rewards, and a potential set
@@ -66,23 +68,37 @@ class SB3CombinedLogReward(CombinedReward):
         :param reward_functions: Each individual reward function.
         :param reward_weights: The weights for each reward.
         """
-        super().__init__(reward_functions,reward_weights)
-        self.index = SB3CombinedLogReward.index_tracker
-        SB3CombinedLogReward.index_tracker += 1
+        super().__init__(reward_functions, reward_weights)
 
-        # make sure there is a folder to dump to
-        os.makedirs('bin/combinedlogfiles', exist_ok=True)
-        self.dumpfile = f'bin/combinedlogfiles/{self.index}.txt'
+        # Make sure there is a folder to dump to
+        os.makedirs(file_location, exist_ok=True)
+        self.file_location = f'{file_location}/rewards.txt'
+        self.lockfile = f'{file_location}/reward_lock'
 
-        # clean out any files that are left over from previous runs
-        if self.index == 0:
-            for file in os.listdir('bin/combinedlogfiles'):
-                if '.txt' in file:
-                    os.remove('bin/combinedlogfiles/'+file)
-
-
-        # initiates the array that will store the rewards
+        # Initiates the array that will store the episode totals
         self.returns = np.zeros(len(self.reward_functions))
+
+        # Obtain the lock
+        while True:
+            try:
+                open(self.lockfile, 'x')
+                break
+            except FileExistsError:
+                pass
+            except PermissionError:
+                pass
+            except Exception as e:
+                print(e)
+
+        # Empty the file
+        with open(self.file_location, 'w') as f:
+            f.write('')
+
+        # Release the lock
+        try:
+            os.remove(self.lockfile)
+        except FileNotFoundError:
+            print('No lock to release! ')
 
     def reset(self, initial_state: GameState):
         self.returns = np.zeros(len(self.reward_functions))
@@ -94,7 +110,7 @@ class SB3CombinedLogReward(CombinedReward):
             for func in self.reward_functions
         ]
 
-        self.returns += [a*b for a, b in zip(rewards, self.reward_weights)] # store the rewards
+        self.returns += [a * b for a, b in zip(rewards, self.reward_weights)]  # store the rewards
 
         return float(np.dot(self.reward_weights, rewards))
 
@@ -104,49 +120,93 @@ class SB3CombinedLogReward(CombinedReward):
             for func in self.reward_functions
         ]
 
-        self.returns += [a*b for a, b in zip(rewards, self.reward_weights)] # store the rewards
+        self.returns += [a * b for a, b in zip(rewards, self.reward_weights)]  # store the rewards
 
-        # write the rewards to file and reset
-        with open(self.dumpfile, 'a') as f:
-            # in a list so we can eval to get it back easily
-            f.write('\n' + str(list(self.returns)))
+        # Obtain the lock
+        while True:
+            try:
+                open(self.lockfile, 'x')
+                break
+            except FileExistsError:
+                pass
+            except PermissionError:
+                pass
+            except Exception as e:
+                print(e)
+
+        # Write the rewards to file and reset
+        with open(self.file_location, 'a') as f:
+            f.write('\n' + json.dumps(self.returns.tolist()))
+
+        # reset the episode totals
         self.returns = np.zeros(len(self.reward_functions))
+
+        # Release the lock
+        try:
+            os.remove(self.lockfile)
+        except FileNotFoundError:
+            print('No lock to release! ')
 
         return float(np.dot(self.reward_weights, rewards))
 
 
 class SB3CombinedLogRewardCallback(BaseCallback):
-    def __init__(self, rew_names:List[str]):
+    def __init__(self, reward_names: List[str], file_location: str = 'combinedlogfiles'):
         """
         Callback to log the data from a SB3CombinedLogReward to the
         same log as the model.
 
-        :param rew_names: List of names that the logger will use for
+        :param reward_names: List of names that the logger will use for
         each reward.
         """
         super().__init__()
-        self.rew_names = rew_names
+        self.reward_names = reward_names
+        self.file_location = file_location + '/rewards.txt'
+        self.lockfile = file_location + '/reward_lock'
 
     def _on_step(self) -> bool:
         return True
 
     def _on_rollout_end(self) -> None:
         returns = []
-        # get all returns out of the files
-        for file in os.listdir('bin/combinedlogfiles'):
-            if '.txt' in file:
-                with open('bin/combinedlogfiles/'+file, 'r') as f:
-                    for line in f:
-                        if line != '\n':
-                            returns.append(eval(line.strip()))
-                # empty the file ready for the next rollout
-                with open('bin/combinedlogfiles/'+file, 'w') as f:
-                    f.write('') 
 
+        # Obtain the lock
+        while True:
+            try:
+                open(self.lockfile, 'x')
+                break
+            except FileExistsError:
+                pass
+            except PermissionError:
+                pass
+            except Exception as e:
+                print(e)
+
+        # Read the file into returns
+        with open(self.file_location, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        line = json.loads(line)
+                        returns.append(line)
+
+                    except Exception as e:
+                        print(f'Exception loading line {line}:\n\t{e}')
+
+        # Release the lock
+        try:
+            os.remove(self.lockfile)
+        except FileNotFoundError:
+            print('No lock to release! ')
+
+        # Make returns into a numpy array so we can make use of numpy features
         returns = np.array(returns)
-        # use as many names as provided, then call them by their index after that
-        names = [self.rew_names[i] if i < len(self.rew_names) else f'reward_{i}' for i in range(returns.shape[1])]
 
-        # log each reward
-        for n, name in enumerate(names):
-            self.model.logger.record('rewards/'+name, np.mean(returns[:, n]))
+        # Log each reward
+        for n in range(returns.shape[1]):
+            try:
+                name = self.reward_names[n]
+            except IndexError:
+                name = f'reward_{n}'
+            self.model.logger.record_mean('rewards/' + name, np.mean(returns[:, n]))
