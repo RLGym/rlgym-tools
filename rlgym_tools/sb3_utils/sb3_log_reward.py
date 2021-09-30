@@ -88,7 +88,7 @@ class SB3CombinedLogReward(CombinedReward):
             except PermissionError:
                 pass
             except Exception as e:
-                print(e)
+                print(f'Error obtaining lock in SB3CombinedLogReward.__init__:\n{e}')
 
         # Empty the file
         with open(self.file_location, 'w') as f:
@@ -132,7 +132,7 @@ class SB3CombinedLogReward(CombinedReward):
             except PermissionError:
                 pass
             except Exception as e:
-                print(e)
+                print(f'Error obtaining lock in SB3CombinedLogReward.get_final_reward:\n{e}')
 
         # Write the rewards to file and reset
         with open(self.file_location, 'a') as f:
@@ -180,7 +180,7 @@ class SB3CombinedLogRewardCallback(BaseCallback):
             except PermissionError:
                 pass
             except Exception as e:
-                print(e)
+                print(f'Error obtaining lock in SB3CombinedLogRewardCallback._on_rollout_end:\n{e}')
 
         # Read the file into returns
         with open(self.file_location, 'r') as f:
