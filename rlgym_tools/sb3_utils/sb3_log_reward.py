@@ -92,9 +92,9 @@ class SB3CombinedLogReward(CombinedReward):
             except Exception as e:
                 print(f'Error obtaining lock in SB3CombinedLogReward.__init__:\n{e}')
 
-        # Empty the file
+        # Empty the file by opening in w mode
         with open(self.file_location, 'w') as f:
-            f.write('')
+            pass
 
         # Release the lock
         try:
