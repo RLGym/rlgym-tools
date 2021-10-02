@@ -121,8 +121,8 @@ class SB3CombinedLogReward(CombinedReward):
             func.get_final_reward(player, state, previous_action)
             for func in self.reward_functions
         ]
-
-        self.returns += [a * b for a, b in zip(rewards, self.reward_weights)]  # store the rewards
+        # Add the rewards to the cumulative totals with numpy broadcasting
+        self.returns += [a * b for a, b in zip(rewards, self.reward_weights)]
 
         # Obtain the lock
         while True:
