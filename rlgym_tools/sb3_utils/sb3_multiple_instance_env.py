@@ -43,7 +43,7 @@ class SB3MultipleInstanceEnv(SubprocVecEnv):
         match_func_or_matches: Union[Callable[[], Match], Sequence[Match]],
         num_instances: Optional[int] = None,
         launch_preference: Optional[Union[LaunchPreference, str]] = LaunchPreference.EPIC,
-        wait_time: float = 60,
+        wait_time: float = 30,
         force_paging: bool = False,
     ):
         """

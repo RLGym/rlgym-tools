@@ -1,5 +1,6 @@
 import numpy as np
 from rlgym.envs import Match
+from rlgym.utils.action_parsers import DiscreteAction
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import VecMonitor, VecNormalize, VecCheckNan
@@ -10,7 +11,6 @@ from rlgym.utils.reward_functions.common_rewards import VelocityPlayerToBallRewa
 from rlgym.utils.state_setters import DefaultState
 from rlgym.utils.terminal_conditions.common_conditions import TimeoutCondition, GoalScoredCondition
 from rlgym_tools.sb3_utils import SB3MultipleInstanceEnv
-from rlgym_tools.sb3_utils.sb3_multidiscrete_wrapper import SB3MultiDiscreteWrapper
 
 if __name__ == '__main__':  # Required for multiprocessing
     frame_skip = 8          # Number of ticks to repeat an action
@@ -29,11 +29,11 @@ if __name__ == '__main__':  # Required for multiprocessing
             self_play=True,
             terminal_conditions=[TimeoutCondition(round(fps * 30)), GoalScoredCondition()],  # Some basic terminals
             obs_builder=AdvancedObs(),  # Not that advanced, good default
-            state_setter=DefaultState()  # Resets to kickoff position
+            state_setter=DefaultState(),  # Resets to kickoff position
+            action_parser=DiscreteAction()  # Discrete > Continuous don't @ me
         )
 
     env = SB3MultipleInstanceEnv(get_match, 2)            # Start 2 instances, waiting 60 seconds between each
-    env = SB3MultiDiscreteWrapper(env)                    # Convert action space to multidiscrete
     env = VecCheckNan(env)                                # Optional
     env = VecMonitor(env)                                 # Recommended, logs mean reward and ep_len to Tensorboard
     env = VecNormalize(env, norm_obs=False, gamma=gamma)  # Highly recommended, normalizes rewards
