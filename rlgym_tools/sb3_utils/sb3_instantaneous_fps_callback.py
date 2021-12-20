@@ -31,7 +31,6 @@ class SB3InstantaneousFPSCallback(BaseCallback):
     self.last_steps.append(self.model.num_timesteps)
     self.last_times.append(time())
     
-    if self.capacity == 1
     fps = (self.last_steps[-1] - self.last_steps[0]) / (self.last_times[-1] - self.last_times[0])
 
     self.model.logger.record('time/instantaneous_fps', fps)
