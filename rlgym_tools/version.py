@@ -8,6 +8,14 @@
 __version__ = '1.4.1'
 
 release_notes = {
+    '1.5.0': {
+        """
+        - Add SB3CombinedLogReward (LuminousLamp)
+        - Add SB3InstantaneousFPSCallback (LuminousLamp)
+        - Add KickoffLikeSetter (Carrot)
+        - Add GameCondition (Rolv)
+        """
+    },
     '1.4.1': {
         """
         - Remove SB3MultiDiscreteWrapper
