@@ -5,9 +5,14 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '1.5.0'
+__version__ = '1.5.1'
 
 release_notes = {
+    '1.5.1': {
+        """
+        - Fix for GameCondition
+        """
+    },
     '1.5.0': {
         """
         - Add SB3CombinedLogReward (LuminousLamp)
