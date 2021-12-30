@@ -11,7 +11,7 @@ class GameCondition(TerminalCondition):  # Mimics a Rocket League game
         self.tick_skip = tick_skip
         self.timer = seconds_left
         self.overtime = False
-        self.done = False
+        self.done = True
         self.initial_state = None
 
     def reset(self, initial_state: GameState):
