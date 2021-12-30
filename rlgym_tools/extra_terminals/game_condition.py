@@ -3,20 +3,22 @@ from rlgym.utils.gamestates import GameState
 
 
 class GameCondition(TerminalCondition):  # Mimics a Rocket League game
-    def __init__(self, tick_skip=8, seconds_left=300):
+    def __init__(self, tick_skip=8, seconds_left=300, forfeit_spg_limit=None):
         # NOTE: Since game isn't reset to kickoff by default,
         # you need to keep this outside the main loop as well,
         # checking the done variable after each GoalTerminal
         super().__init__()
         self.tick_skip = tick_skip
+        self.seconds_left = seconds_left
         self.timer = seconds_left
         self.overtime = False
         self.done = True
         self.initial_state = None
+        self.forfeit_spg_limit = forfeit_spg_limit
 
     def reset(self, initial_state: GameState):
         if self.done:
-            self.timer = 300 * 120 / self.tick_skip
+            self.timer = self.seconds_left
             self.initial_state = initial_state
             self.overtime = False
             self.done = False
@@ -31,12 +33,18 @@ class GameCondition(TerminalCondition):  # Mimics a Rocket League game
                 self.timer += self.tick_skip / 120
                 self.done = False
         else:
-            if self.timer <= 0 and current_state.ball.position[3] <= 100:
+            if self.timer <= 0 and current_state.ball.position[2] <= 100:
                 # Can't detect ball on ground directly, should be an alright approximation
                 if differential != 0:
                     self.done = True
                 else:
                     self.overtime = True
                     self.done = False
-        self.timer -= self.tick_skip / 120
+            elif self.forfeit_spg_limit is not None \
+                    and abs(differential) >= 3 \
+                    and self.timer / abs(differential) < self.forfeit_spg_limit:
+                self.done = True
+            else:
+                self.timer -= self.tick_skip / 120
+
         return self.done
