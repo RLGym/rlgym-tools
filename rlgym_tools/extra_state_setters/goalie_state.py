@@ -85,7 +85,7 @@ class GoaliePracticeState(StateSetter):
             
     def _place_car_in_box_area(self, car, team_delin):
         """
-        Function to set a new ball towards a goal
+        Function to place a car in an allowed areaI 
 
         :param car: car to be modified
         :param team_delin: team number delinator to look at when deciding where to place the car
@@ -130,7 +130,9 @@ class GoaliePracticeState(StateSetter):
         
         #random pick x value of target in goal
         x_pos = random.uniform(GOAL_X_MIN, GOAL_X_MAX)
-        y_vel = 3000 * INVERT_IF_BLUE
+        
+        #if its not an air shot, we can randomize the shot speed
+        y_vel = (3000 * INVERT_IF_BLUE) if aerial_only else (random.uniform(500,  5000) * INVERT_IF_BLUE)
         
         if shotpick == 0: #long range shot 
              
