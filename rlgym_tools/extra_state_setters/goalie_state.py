@@ -78,10 +78,12 @@ class GoaliePracticeState(StateSetter):
                     self._place_car_in_box_area(car, car.team_num)                    
             
             
-            car.set_rot(0, rand.random() * YAW_MAX - YAW_MAX/2, 0) 
-            
             if reset_to_max_boost:
                 car.boost = 100
+            
+            car.set_rot(0, rand.random() * YAW_MAX - YAW_MAX/2, 0) 
+            
+            
             
     def _place_car_in_box_area(self, car, team_delin):
         """
@@ -127,38 +129,44 @@ class GoaliePracticeState(StateSetter):
     
         shotpick = random.randrange(4)        
         INVERT_IF_BLUE = (-1 if team_turn == 0 else 1) #invert shot for orange
+        shotpick = 2
         
         #random pick x value of target in goal
         x_pos = random.uniform(GOAL_X_MIN, GOAL_X_MAX)
         
         #if its not an air shot, we can randomize the shot speed
-        y_vel = (3000 * INVERT_IF_BLUE) if aerial_only else (random.uniform(500,  5000) * INVERT_IF_BLUE)
+        shot_randomizer = 1 if aerial_only else (random.uniform(0,1) )
         
+        y_vel = (3000 * INVERT_IF_BLUE) if aerial_only else (3000 * shot_randomizer * INVERT_IF_BLUE)
+        
+        print(shotpick)
         if shotpick == 0: #long range shot 
              
-            z_pos = 1500 if aerial_only else random.uniform(0, 1500) 
+            z_pos = 1500 if aerial_only else random.uniform(100, 1500) 
             
             pos = np.array([x_pos,  -3300 * INVERT_IF_BLUE, z_pos])
             lin_vel = np.array([0, y_vel, 600])
         elif shotpick == 1: #medium range shot
-            z_pos =  1550 if aerial_only else random.uniform(0,  1550)  
+            z_pos =  1550 if aerial_only else random.uniform(100,  1550)  
             
             pos = np.array([x_pos, -500 * INVERT_IF_BLUE, z_pos])
             lin_vel = np.array([0, y_vel, 100])
             
         elif shotpick == 2: #angled shot    
-            z_pos =  1500 if aerial_only else random.uniform(0,  1500) 
+            z_pos =  1500 if aerial_only else random.uniform(100,  1500) 
             x_pos += 3200 #add offset to start the shot from the side
             
             pos = np.array([x_pos,  0, z_pos])
-            lin_vel = np.array([-1900, y_vel, 0])
+            lin_vel = np.array([-1900 * shot_randomizer, y_vel, 0])
             
         elif shotpick == 3: # opposite angled shot    
-            z_pos =  1500 if aerial_only else random.uniform(0,  1500) 
+            z_pos =  1500 if aerial_only else random.uniform(100,  1500) 
             x_pos -= 3200 #add offset to start the shot from the other side
             
             pos = np.array([x_pos,  0, z_pos])
-            lin_vel = np.array([1900, y_vel, 0])
+            lin_vel = np.array([1900 * shot_randomizer, y_vel, 0])
+        else:
+            print("FAULT")
         
         ang_vel = np.array([0, 0, 0])
         
