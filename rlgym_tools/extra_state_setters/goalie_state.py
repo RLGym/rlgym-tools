@@ -128,7 +128,7 @@ class GoaliePracticeState(StateSetter):
         # *** They are unrelated to numbers in other functions ***
     
         shotpick = random.randrange(4)        
-        INVERT_IF_BLUE = (-1 if team_turn == 0 else 1) #invert shot for orang
+        INVERT_IF_BLUE = (-1 if team_turn == 0 else 1) #invert shot for blue
         
         #random pick x value of target in goal
         x_pos = random.uniform(GOAL_X_MIN, GOAL_X_MAX)
