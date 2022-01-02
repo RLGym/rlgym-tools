@@ -68,7 +68,7 @@ if __name__ == '__main__':
         total_timesteps=10_000_000,  # total timestamps that will be trained for
         env=env,
         callbacks=callbacks,  # list of callbacks, one for each model in the list of models
-        num_players=8,  # team_size * num_instances
+        num_players=8,  # team_size * num_instances * 2
         model_map=model_map,  # mapping of models to players.
         learning_mask=learning_mask
     )
