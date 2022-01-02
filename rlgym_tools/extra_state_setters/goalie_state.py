@@ -128,18 +128,15 @@ class GoaliePracticeState(StateSetter):
         # *** They are unrelated to numbers in other functions ***
     
         shotpick = random.randrange(4)        
-        INVERT_IF_BLUE = (-1 if team_turn == 0 else 1) #invert shot for orange
-        shotpick = 2
+        INVERT_IF_BLUE = (-1 if team_turn == 0 else 1) #invert shot for orang
         
         #random pick x value of target in goal
         x_pos = random.uniform(GOAL_X_MIN, GOAL_X_MAX)
         
         #if its not an air shot, we can randomize the shot speed
-        shot_randomizer = 1 if aerial_only else (random.uniform(0,1) )
+        shot_randomizer = 1 if aerial_only else (random.uniform(.2,1) )
         
         y_vel = (3000 * INVERT_IF_BLUE) if aerial_only else (3000 * shot_randomizer * INVERT_IF_BLUE)
-        
-        print(shotpick)
         if shotpick == 0: #long range shot 
              
             z_pos = 1500 if aerial_only else random.uniform(100, 1500) 
