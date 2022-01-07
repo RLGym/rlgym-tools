@@ -53,11 +53,11 @@ def convert_replay(replay: Union[str, AnalysisManager]):
     }
 
     ball_pos_pyr_vel_angvel = (
-            replay.game.ball[["pos_x", "pos_y", "pos_z"]].values.astype(float),
-            replay.game.ball[["rot_x", "rot_y", "rot_z"]].fillna(0).values.astype(float),
-            replay.game.ball[["vel_x", "vel_y", "vel_z"]].fillna(0).values.astype(float) / 10,
-            replay.game.ball[["ang_vel_x", "ang_vel_y", "ang_vel_z"]].fillna(0).values.astype(float) / 1000,
-        )
+        replay.game.ball[["pos_x", "pos_y", "pos_z"]].values.astype(float),
+        replay.game.ball[["rot_x", "rot_y", "rot_z"]].fillna(0).values.astype(float),
+        replay.game.ball[["vel_x", "vel_y", "vel_z"]].fillna(0).values.astype(float) / 10,
+        replay.game.ball[["ang_vel_x", "ang_vel_y", "ang_vel_z"]].fillna(0).values.astype(float) / 1000,
+    )
 
     rallies = []
     for kf1, kf2 in zip(replay.game.kickoff_frames, replay.game.kickoff_frames[1:] + [replay.game.frames.index[-1]]):
@@ -173,19 +173,19 @@ def convert_replay(replay: Union[str, AnalysisManager]):
         if np.isnan(pos).any():
             continue  # Goal scored, go next
         state.ball = PhysicsObject(
-                position=pos,
-                quaternion=math.rotation_to_quaternion(math.euler_to_rotation(pyr)),
-                linear_velocity=vel,
-                angular_velocity=ang_vel
-            )
+            position=pos,
+            quaternion=math.rotation_to_quaternion(math.euler_to_rotation(pyr)),
+            linear_velocity=vel,
+            angular_velocity=ang_vel
+        )
 
         # inverted_ball
         state.inverted_ball = PhysicsObject(
-                position=pos * invert,
-                quaternion=math.rotation_to_quaternion(math.euler_to_rotation(pyr * invert[::-1])),
-                linear_velocity=vel * invert,
-                angular_velocity=ang_vel * invert
-            )
+            position=pos * invert,
+            quaternion=math.rotation_to_quaternion(math.euler_to_rotation(pyr * invert[::-1])),
+            linear_velocity=vel * invert,
+            angular_velocity=ang_vel * invert
+        )
 
         # boost_pads
         state.boost_pads = (boost_timers == 0) * 1
@@ -199,5 +199,7 @@ def convert_replay(replay: Union[str, AnalysisManager]):
         boost_timers[boost_timers < 0] = 0
         demo_timers[demo_timers < 0] = 0
         last_frame = frame
+
+        state.players.sort(key=lambda p: (p.team_num, p.car_id))
 
         yield state, actions
