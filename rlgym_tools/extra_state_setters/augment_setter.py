@@ -25,7 +25,7 @@ class AugmentSetter(StateSetter):
 
     def reset(self, state_wrapper: StateWrapper):
         self.state_setter.reset(state_wrapper)
-        self._debug(state_wrapper)
+        # self._debug(state_wrapper)
 
         bits = getrandbits(2)
         if self.shuffle_within_teams:
@@ -37,7 +37,7 @@ class AugmentSetter(StateSetter):
         if self.swap_left_right and (bits & AugmentSetter.MASK_SWAP_LEFT_RIGHT):
             self.mirror_left_right(state_wrapper)
 
-        self._debug(state_wrapper)
+        # self._debug(state_wrapper)
 
     def _debug(self, state_wrapper: StateWrapper):
         print("\n".join(f"Car {car.id}, team: {car.team_num}, pos: {car.position}" for car in state_wrapper.cars))
