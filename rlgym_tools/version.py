@@ -5,12 +5,14 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '1.5.4'
+__version__ = '1.6.0'
 
 release_notes = {
-    '1.5.4': {
+    '1.6.0': {
         """
-        - Added GoaliePracticeState setter
+        - Added GoaliePracticeState setter (Soren)
+        - Added ReplaySetter (Carrot)
+        - Added AugmentSetter (NeverCast)
         """
     },
     '1.5.3': {
