@@ -58,6 +58,8 @@ class AugmentSetter(StateSetter):
                 car1.rotation[:].copy(), car0.rotation[:].copy()
             car0.angular_velocity[:], car1.angular_velocity[:] = \
                 car1.angular_velocity[:].copy(), car0.angular_velocity[:].copy()
+            car0.boost, car1.boost = \
+                car1.boost, car0.boost
 
     @staticmethod
     def shuffle_players(state_wrapper: StateWrapper):

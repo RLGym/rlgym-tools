@@ -13,7 +13,8 @@ from rlgym.utils.gamestates import GameState, PhysicsObject, PlayerData
 
 boost_locations = np.array(BOOST_LOCATIONS)  # Need ndarray for speed
 
-invert = np.array((-1, -1, 1))
+_invert = np.array((-1, -1, 1))
+_rot_correct = np.array((-1, 1, -1))
 
 
 def convert_replay(replay: Union[str, AnalysisManager]):
@@ -42,7 +43,7 @@ def convert_replay(replay: Union[str, AnalysisManager]):
     player_pos_pyr_vel_angvel_boost_controls = {  # Preload useful arrays so we can fetch by index later
         player.online_id: (
             player.data[["pos_x", "pos_y", "pos_z"]].values.astype(float),
-            player.data[["rot_x", "rot_y", "rot_z"]].fillna(0).values.astype(float),
+            player.data[["rot_x", "rot_y", "rot_z"]].fillna(0).values.astype(float) * _rot_correct,
             player.data[["vel_x", "vel_y", "vel_z"]].fillna(0).values.astype(float) / 10,
             player.data[["ang_vel_x", "ang_vel_y", "ang_vel_z"]].fillna(0).values.astype(float) / 1000,
             player.data["boost"].fillna(0).astype(float) / 255,
@@ -54,7 +55,7 @@ def convert_replay(replay: Union[str, AnalysisManager]):
 
     ball_pos_pyr_vel_angvel = (
         replay.game.ball[["pos_x", "pos_y", "pos_z"]].values.astype(float),
-        replay.game.ball[["rot_x", "rot_y", "rot_z"]].fillna(0).values.astype(float),
+        replay.game.ball[["rot_x", "rot_y", "rot_z"]].fillna(0).values.astype(float) * _rot_correct,
         replay.game.ball[["vel_x", "vel_y", "vel_z"]].fillna(0).values.astype(float) / 10,
         replay.game.ball[["ang_vel_x", "ang_vel_y", "ang_vel_z"]].fillna(0).values.astype(float) / 1000,
     )
@@ -147,10 +148,10 @@ def convert_replay(replay: Union[str, AnalysisManager]):
                 angular_velocity=ang_vel
             )
             player_data.inverted_car_data = PhysicsObject(
-                position=pos * invert,
-                quaternion=math.rotation_to_quaternion(math.euler_to_rotation(pyr * invert[::-1])),
-                linear_velocity=vel * invert,
-                angular_velocity=ang_vel * invert
+                position=pos * _invert,
+                quaternion=math.rotation_to_quaternion((math.euler_to_rotation(pyr).T * _invert).T),
+                linear_velocity=vel * _invert,
+                angular_velocity=ang_vel * _invert
             )
 
             old_boost = boost_amounts.get(player.online_id, float("inf"))
@@ -181,10 +182,10 @@ def convert_replay(replay: Union[str, AnalysisManager]):
 
         # inverted_ball
         state.inverted_ball = PhysicsObject(
-            position=pos * invert,
-            quaternion=math.rotation_to_quaternion(math.euler_to_rotation(pyr * invert[::-1])),
-            linear_velocity=vel * invert,
-            angular_velocity=ang_vel * invert
+            position=pos * _invert,
+            quaternion=math.rotation_to_quaternion((math.euler_to_rotation(pyr).T * _invert).T),
+            linear_velocity=vel * _invert,
+            angular_velocity=ang_vel * _invert
         )
 
         # boost_pads
