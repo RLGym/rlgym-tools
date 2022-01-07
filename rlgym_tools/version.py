@@ -13,6 +13,7 @@ release_notes = {
         - Added GoaliePracticeState setter (Soren)
         - Added ReplaySetter (Carrot)
         - Added AugmentSetter (NeverCast)
+        - Fixed an error in replay converter
         """
     },
     '1.5.3': {
