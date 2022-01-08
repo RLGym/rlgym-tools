@@ -87,7 +87,7 @@ class AugmentSetter(StateSetter):
         for obj in [state_wrapper.ball] + state_wrapper.cars:
             obj.set_pos(*(mul * obj.position))
             obj.set_lin_vel(*(mul * obj.linear_velocity))
-            obj.set_ang_vel(*(mul * obj.angular_velocity))
+            obj.set_ang_vel(*(-mul * obj.angular_velocity))  # Angular velocities are negated
 
             if isinstance(obj, CarWrapper):
                 pitch, yaw, roll = obj.rotation
@@ -104,7 +104,7 @@ class AugmentSetter(StateSetter):
         for obj in [state_wrapper.ball] + state_wrapper.cars:
             obj.set_pos(*(mul * obj.position))
             obj.set_lin_vel(*(mul * obj.linear_velocity))
-            obj.set_ang_vel(*(mul * obj.angular_velocity))
+            obj.set_ang_vel(*(-mul * obj.angular_velocity))  # Angular velocities are negated
 
             if isinstance(obj, CarWrapper):
                 pitch, yaw, roll = obj.rotation
