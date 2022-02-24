@@ -68,9 +68,9 @@ if __name__ == '__main__':  # Required for multiprocessing
     model = PPO.load(
         "policy/rl_model_1000002_steps.zip",
         env,
-        custom_objects=dict(n_envs=env.num_envs, _last_obs=None)  # Need this to change number of agents
-        device="auto"  # Need to set device again (if using a specific one)
+        custom_objects=dict(n_envs=env.num_envs, _last_obs=None),  # Need this to change number of agents
+        device="auto",  # Need to set device again (if using a specific one)
+        force_reset=True  # Make SB3 reset the env so it doesn't think we're continuing from last state
     )
-    env.reset()  # Important when loading models, SB3 does not do this for you
     # Use reset_num_timesteps=False to keep going with same logger/checkpoints
     model.learn(100_000_000, callback=callback, reset_num_timesteps=False)
