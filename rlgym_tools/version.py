@@ -11,8 +11,9 @@ release_notes = {
     '1.6.2':
         """
         - Added hoops-like setter (Carrot)
-        - Fix kickoff-like setter (Carrot)
-        - Fix pitch in KBMAction (Rolv)
+        - Fixed kickoff-like setter (Carrot)
+        - Fixed pitch in KBMAction (Rolv)
+        - Added include_frame option in replay converter (wrongu)
         """,
     '1.6.1':
         """
