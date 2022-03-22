@@ -8,105 +8,98 @@
 __version__ = '1.6.2'
 
 release_notes = {
-    '1.6.2': {
+    '1.6.2':
         """
         - Added hoops-like setter (Carrot)
         - Fix kickoff-like setter (Carrot)
         - Fix pitch in KBMAction (Rolv)
-        """
-    },
-    '1.6.1': {
+        """,
+    '1.6.1':
         """
         - Fixed angular velocities in replay augmenter
-        """
-    },
-    '1.6.0': {
+        """,
+    '1.6.0':
         """
         - Added GoaliePracticeState setter (Soren)
         - Added ReplaySetter (Carrot)
         - Added AugmentSetter (NeverCast)
         - Fixed an error in replay converter
-        """
-    },
-    '1.5.3': {
+        """,
+    '1.5.3':
         """
         - Yet another fix for GameCondition
-        """
-    },
-    '1.5.2': {
+        """,
+    '1.5.2':
         """
         - Another fix for GameCondition
-        """
-    },
-    '1.5.1': {
+        """,
+    '1.5.1':
         """
         - Fix for GameCondition
-        """
-    },
-    '1.5.0': {
+        """,
+    '1.5.0':
         """
         - Add SB3CombinedLogReward (LuminousLamp)
         - Add SB3InstantaneousFPSCallback (LuminousLamp)
         - Add KickoffLikeSetter (Carrot)
         - Add GameCondition (Rolv)
-        """
-    },
-    '1.4.1': {
+        """,
+    '1.4.1':
         """
         - Remove SB3MultiDiscreteWrapper
         - Update SB3 examples to include action parsers
-        """
-    },
-    '1.4.0': {
+        """,
+    '1.4.0':
         """
         - Add KBM action parser
+        """,
+    '1.3.0':
         """
-    },
-    '1.3.0': 
-    """
-    - Add KickoffReward (Impossibum)
-    - Add SequentialReward (Impossibum)
-    - Better individual reward logging for SB3 (LuminousLamp)
-    - Add launch_preference as parameter to SB3MultipleInstanceEnv
-    """,
+        - Add KickoffReward (Impossibum)
+        - Add SequentialReward (Impossibum)
+        - Better individual reward logging for SB3 (LuminousLamp)
+        - Add launch_preference as parameter to SB3MultipleInstanceEnv
+        """,
     '1.2.0':
-    """
-    - Added multi-model support for SB3
-    - Added weighted sample setter
-    - Added general stacker
-    - Various bug fixes
-    """,
+        """
+        - Added multi-model support for SB3
+        - Added weighted sample setter
+        - Added general stacker
+        - Various bug fixes
+        """,
     '1.1.4':
-    """
-    - Bug fixes for AdvancedStacker
-    """,
+        """
+        - Bug fixes for AdvancedStacker
+        """,
     '1.1.3':
-    """
-    - Fix RLGym 1.0 incompatibility
-    """,
+        """
+        - Fix RLGym 1.0 incompatibility
+        """,
     '1.1.2':
-    """
-    - Fix version import (was absolute, now relative)
-    """,
+        """
+        - Fix version import (was absolute, now relative)
+        """,
     '1.1.1':
-    """
-    - Fixed an invalid Python 3.7 import
-    - AnnealRewards now has initial_count parameter
-    """,
-    '1.1.0': """
-    - Added functionality in SB3MultipleInstanceEnv to take multiple match objects (one for each instance).
-    - Added AnnealRewards for transitioning between reward functions.
-    - Added granularity option to SB3MultiDiscreteWrapper.
-    - Added negative slope parameter to DiffReward (negative values are multiplied by this).
-    """,
-    '1.0.0': """
-    - Added replay to rlgym GameState converter
-    - Moved SB3 environments from rlgym (now called SB3SingleInstanceEnv and SB3MultipleInstanceEnv) and fixed some bugs
-    - Added SB3MultiDiscreteWrapper, SB3DistributeRewardsWrapper and SB3LogReward 
-    - Added extra reward functions (DiffReward, DistributeRewards and MultiplyRewards)
-    - Added RLLibEnv
-    - Added working example code for SB3 and RLlib
-    """
+        """
+        - Fixed an invalid Python 3.7 import
+        - AnnealRewards now has initial_count parameter
+        """,
+    '1.1.0':
+        """
+        - Added functionality in SB3MultipleInstanceEnv to take multiple match objects (one for each instance).
+        - Added AnnealRewards for transitioning between reward functions.
+        - Added granularity option to SB3MultiDiscreteWrapper.
+        - Added negative slope parameter to DiffReward (negative values are multiplied by this).
+        """,
+    '1.0.0':
+        """
+        - Added replay to rlgym GameState converter
+        - Moved SB3 environments from rlgym (now called SB3SingleInstanceEnv and SB3MultipleInstanceEnv) and fixed some bugs
+        - Added SB3MultiDiscreteWrapper, SB3DistributeRewardsWrapper and SB3LogReward 
+        - Added extra reward functions (DiffReward, DistributeRewards and MultiplyRewards)
+        - Added RLLibEnv
+        - Added working example code for SB3 and RLlib
+        """
 }
 
 
