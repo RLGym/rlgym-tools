@@ -17,7 +17,7 @@ _invert = np.array((-1, -1, 1))
 _rot_correct = np.array((-1, 1, -1))
 
 
-def convert_replay(replay: Union[str, AnalysisManager]):
+def convert_replay(replay: Union[str, AnalysisManager], include_frame=False):
     if isinstance(replay, str):
         replay = cb.analyze_replay_file(replay, logging_level=logging.CRITICAL)
     ControlsCreator().get_controls(replay.game)
@@ -203,4 +203,4 @@ def convert_replay(replay: Union[str, AnalysisManager]):
 
         state.players.sort(key=lambda p: (p.team_num, p.car_id))
 
-        yield state, actions
+        yield (state, actions, frame) if include_frame else (state, actions)
