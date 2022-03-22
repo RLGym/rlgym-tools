@@ -5,9 +5,16 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '1.6.1'
+__version__ = '1.6.2'
 
 release_notes = {
+    '1.6.2': {
+        """
+        - Added hoops-like setter (Carrot)
+        - Fix kickoff-like setter (Carrot)
+        - Fix pitch in KBMAction (Rolv)
+        """
+    },
     '1.6.1': {
         """
         - Fixed angular velocities in replay augmenter
