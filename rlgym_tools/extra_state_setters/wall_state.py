@@ -131,7 +131,6 @@ class WallPracticeState(StateSetter):
         wall_car_y = 5120 * defense_inverter
         wall_car_z = 1000 + (random.randrange(500) - 500)
         wall_car.set_pos(wall_car_x, wall_car_y, wall_car_z)
-        wall_car.set_lin_vel(0, 0, -600)
 
         wall_pitch_rot = (0 if side_inverter == -1 else 180) * DEG_TO_RAD
         wall_yaw_rot = 0 * DEG_TO_RAD
