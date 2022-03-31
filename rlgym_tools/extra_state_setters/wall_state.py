@@ -65,7 +65,6 @@ class WallPracticeState(StateSetter):
         blue_z = 400 + (random.randrange(400) - 200)
         wall_car_blue.set_pos(blue_x, blue_y, blue_z)
         wall_car_blue.boost = 100
-        wall_car_blue.set_lin_vel(2000 * side_inverter, 0, 0)
 
 
         #orange car setup
@@ -80,7 +79,6 @@ class WallPracticeState(StateSetter):
         orange_z = 400 + (random.randrange(400) - 200)
         wall_car_orange.set_pos(orange_x, orange_y, orange_z)
         wall_car_orange.boost = 100
-        wall_car_orange.set_lin_vel(-2000 * side_inverter, 0, 0)
 
 
         for car in state_wrapper.cars:
