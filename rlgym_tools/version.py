@@ -5,9 +5,14 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '1.6.4'
+__version__ = '1.6.5'
 
 release_notes = {
+    '1.6.5':
+        """
+        -GoalieStateSetter now better emulates incoming airdribbles
+        -fixed WallStateSetter bug and increased starting diversity
+        """,
     '1.6.4':
         """
         -Added wall play state setter (Soren)
