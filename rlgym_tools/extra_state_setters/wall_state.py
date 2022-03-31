@@ -65,6 +65,8 @@ class WallPracticeState(StateSetter):
         blue_z = 400 + (random.randrange(400) - 200)
         wall_car_blue.set_pos(blue_x, blue_y, blue_z)
         wall_car_blue.boost = 100
+        wall_car_blue.set_lin_vel(2000 * side_inverter, 0, 0)
+
 
         #orange car setup
         orange_pitch_rot = 0 * DEG_TO_RAD
@@ -72,11 +74,14 @@ class WallPracticeState(StateSetter):
         orange_roll_rot = -90 * side_inverter * DEG_TO_RAD
         wall_car_orange.set_rot(orange_pitch_rot, orange_yaw_rot, orange_roll_rot)
 
+
         orange_x = 4096 * side_inverter
         orange_y = 2500 + (random.randrange(500) - 250)
         orange_z = 400 + (random.randrange(400) - 200)
         wall_car_orange.set_pos(orange_x, orange_y, orange_z)
         wall_car_orange.boost = 100
+        wall_car_orange.set_lin_vel(-2000 * side_inverter, 0, 0)
+
 
         for car in state_wrapper.cars:
             if car is wall_car_orange or car is wall_car_blue:
@@ -98,7 +103,7 @@ class WallPracticeState(StateSetter):
         sidepick = random.randrange(2)
 
         defense_inverter = 1
-        if defense_team == 1:
+        if defense_team == 0:
             # change side
             defense_inverter = -1
 
@@ -112,10 +117,10 @@ class WallPracticeState(StateSetter):
         x_random = random.randrange(446)
         ball_x_pos = (-2850 + x_random) * side_inverter
         ball_y_pos = (5120 - BALL_RADIUS) * defense_inverter
-        ball_z_pos = 1400
+        ball_z_pos = 1400 + random.randrange(400) - 200
         state_wrapper.ball.set_pos(ball_x_pos, ball_y_pos, ball_z_pos)
 
-        ball_x_vel = 1000 * side_inverter
+        ball_x_vel = (1000 + random.randrange(400) - 200) * side_inverter
         ball_y_vel = 0
         ball_z_vel = 550
         state_wrapper.ball.set_lin_vel(ball_x_vel, ball_y_vel, ball_z_vel)
@@ -128,6 +133,7 @@ class WallPracticeState(StateSetter):
         wall_car_y = 5120 * defense_inverter
         wall_car_z = 1000 + (random.randrange(500) - 500)
         wall_car.set_pos(wall_car_x, wall_car_y, wall_car_z)
+        wall_car.set_lin_vel(0, 0, -600)
 
         wall_pitch_rot = (0 if side_inverter == -1 else 180) * DEG_TO_RAD
         wall_yaw_rot = 0 * DEG_TO_RAD
