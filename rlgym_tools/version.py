@@ -8,6 +8,11 @@
 __version__ = '1.6.5'
 
 release_notes = {
+    '1.6.5':
+        """
+        -GoalieStateSetter now better emulates incoming airdribbles
+        -fixed WallStateSetter bug and increased starting diversity
+        """,
     '1.6.4':
         """
         -Added wall play state setter (Soren)
