@@ -134,7 +134,7 @@ class GoaliePracticeState(StateSetter):
         x_pos = random.uniform(GOAL_X_MIN, GOAL_X_MAX)
 
         # if its not an air shot, we can randomize the shot speed
-        shot_randomizer = 1 if aerial_only else (random.uniform(.2, 1))
+        shot_randomizer = 1 if aerial_only else (random.uniform(.6, 1))
 
         y_vel = (3000 * INVERT_IF_BLUE) if aerial_only else (3000 * shot_randomizer * INVERT_IF_BLUE)
         if shotpick == 0:  # long range shot
@@ -152,16 +152,24 @@ class GoaliePracticeState(StateSetter):
         elif shotpick == 2:  # angled shot
             z_pos = 1500 if aerial_only else random.uniform(100, 1500)
             x_pos += 3200  # add offset to start the shot from the side
+            y_pos = -2000 * INVERT_IF_BLUE
 
-            pos = np.array([x_pos, 0, z_pos])
-            lin_vel = np.array([-1900 * shot_randomizer, y_vel, 0])
+            x_vel = -1100
+            y_vel = 2500 * INVERT_IF_BLUE
+
+            pos = np.array([x_pos, y_pos, z_pos])
+            lin_vel = np.array([x_vel, y_vel, 650])
 
         elif shotpick == 3:  # opposite angled shot
             z_pos = 1500 if aerial_only else random.uniform(100, 1500)
             x_pos -= 3200  # add offset to start the shot from the other side
+            y_pos = 2000 * INVERT_IF_BLUE
 
-            pos = np.array([x_pos, 0, z_pos])
-            lin_vel = np.array([1900 * shot_randomizer, y_vel, 0])
+            x_vel = 1100
+            y_vel = -2500 * INVERT_IF_BLUE
+
+            pos = np.array([x_pos, y_pos, z_pos])
+            lin_vel = np.array([x_vel, y_vel, 650])
         else:
             print("FAULT")
 
