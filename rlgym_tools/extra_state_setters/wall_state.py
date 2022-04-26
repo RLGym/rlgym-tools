@@ -95,11 +95,9 @@ class WallPracticeState(StateSetter):
         ball_z_pos = BALL_RADIUS
         state_wrapper.ball.set_pos(ball_x_pos, ball_y_pos, ball_z_pos)
 
-        zvel = random.randrange(300)
-        print("Zvel: "+str(zvel))
         ball_x_vel = (2000 + random.randrange(1000) - 500) * side_inverter
         ball_y_vel = random.randrange(1500) - 750
-        ball_z_vel = zvel
+        ball_z_vel = random.randrange(300)
         state_wrapper.ball.set_lin_vel(ball_x_vel, ball_y_vel, ball_z_vel)
 
         wall_car_blue = [car for car in state_wrapper.cars if car.team_num == 0][0]
