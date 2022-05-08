@@ -16,7 +16,7 @@ release_notes = {
         - Add generate_probabilities as a method to ReplaySetter (Rolv)
         - Upgrade WallSetter (Soren) and fix bug when num_cars == 1 (Kaiyotech)
         - Add max overtime to GameCondition (Rolv)
-        """
+        """,
     '1.6.6':
         """
         -WallStateSetter now has airdribble setups and harder wall plays
