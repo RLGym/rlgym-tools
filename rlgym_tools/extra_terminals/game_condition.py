@@ -3,7 +3,7 @@ from rlgym.utils.gamestates import GameState
 
 
 class GameCondition(TerminalCondition):  # Mimics a Rocket League game
-    def __init__(self, tick_skip=8, seconds_left=300, forfeit_spg_limit=None):
+    def __init__(self, tick_skip=8, seconds_left=300, forfeit_spg_limit=None, max_overtime=300):
         # NOTE: Since game isn't reset to kickoff by default,
         # you need to keep this outside the main loop as well,
         # checking the done variable after each GoalTerminal
@@ -14,7 +14,8 @@ class GameCondition(TerminalCondition):  # Mimics a Rocket League game
         self.overtime = False
         self.done = True
         self.initial_state = None
-        self.forfeit_spg_limit = forfeit_spg_limit
+        self.forfeit_spg_limit = forfeit_spg_limit  # SPG = Seconds Per Goal
+        self.max_overtime = max_overtime
 
     def reset(self, initial_state: GameState):
         if self.done:
@@ -29,6 +30,8 @@ class GameCondition(TerminalCondition):  # Mimics a Rocket League game
         if self.overtime:
             if differential != 0:
                 self.done = True
+            elif self.timer >= self.max_overtime:
+                self.done = True  # Call it a draw
             else:
                 self.timer += self.tick_skip / 120
                 self.done = False
