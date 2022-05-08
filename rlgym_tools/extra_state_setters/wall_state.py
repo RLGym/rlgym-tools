@@ -18,12 +18,61 @@ class WallPracticeState(StateSetter):
         super().__init__()
 
     def reset(self, state_wrapper: StateWrapper):
-        scenario_pick = random.randrange(2)
+        scenario_pick = random.randrange(3)
 
         if scenario_pick == 0:
             self._short_goal_roll(state_wrapper)
         elif scenario_pick == 1:
             self._side_high_roll(state_wrapper)
+        elif scenario_pick == 2:
+            self._air_dribble_setup(state_wrapper)
+
+    def _air_dribble_setup(self, state_wrapper):
+        """
+        A medium roll up a side wall with the car facing the roll path
+
+        :param state_wrapper:
+        """
+
+        axis_inverter = 1 if random.randrange(2) == 1 else -1
+        team_side = 0 if random.randrange(2) == 1 else 1
+        team_inverter = 1 if team_side == 0 else -1
+
+        #if only 1 play, team is always 0
+
+        ball_x_pos = 3000 * axis_inverter
+        ball_y_pos = random.randrange(7600) - 3800
+        ball_z_pos = BALL_RADIUS
+        state_wrapper.ball.set_pos(ball_x_pos, ball_y_pos, ball_z_pos)
+
+        ball_x_vel = (2000 + (random.randrange(1000) - 500)) * axis_inverter
+        ball_y_vel = random.randrange(1000) * team_inverter
+        ball_z_vel = 0
+        state_wrapper.ball.set_lin_vel(ball_x_vel, ball_y_vel, ball_z_vel)
+
+        chosen_car = [car for car in state_wrapper.cars if car.team_num == team_side][0]
+        #if randomly pick, chosen_car is from orange instead
+
+        car_x_pos = 2500 * axis_inverter
+        car_y_pos = ball_y_pos
+        car_z_pos = 27
+
+        yaw = 0 if axis_inverter == 1 else 180
+        car_pitch_rot = 0 * DEG_TO_RAD
+        car_yaw_rot = (yaw + (random.randrange(40) - 20)) * DEG_TO_RAD
+        car_roll_rot = 0 * DEG_TO_RAD
+
+        chosen_car.set_pos(car_x_pos, car_y_pos, car_z_pos)
+        chosen_car.set_rot(car_pitch_rot, car_yaw_rot, car_roll_rot)
+        chosen_car.boost = 100
+
+        for car in state_wrapper.cars:
+            if car is chosen_car:
+                continue
+
+            # set all other cars randomly in the field
+            car.set_pos(random.randrange(2944) - 1472, random.randrange(3968) - 1984, 0)
+            car.set_rot(0, (random.randrange(360) - 180) * (3.1415927 / 180), 0)
 
     def _side_high_roll(self, state_wrapper):
         """
@@ -48,7 +97,7 @@ class WallPracticeState(StateSetter):
 
         ball_x_vel = (2000 + random.randrange(1000) - 500) * side_inverter
         ball_y_vel = random.randrange(1500) - 750
-        ball_z_vel = 0
+        ball_z_vel = random.randrange(300)
         state_wrapper.ball.set_lin_vel(ball_x_vel, ball_y_vel, ball_z_vel)
 
         wall_car_blue = [car for car in state_wrapper.cars if car.team_num == 0][0]
@@ -62,10 +111,11 @@ class WallPracticeState(StateSetter):
 
         blue_x = 4096 * side_inverter
         blue_y = -2500 + (random.randrange(500) - 250)
-        blue_z = 400 + (random.randrange(400) - 200)
+        blue_z = 600 + (random.randrange(400) - 200)
         wall_car_blue.set_pos(blue_x, blue_y, blue_z)
         wall_car_blue.boost = 100
 
+        wall_car_orange = None
         if len(state_wrapper.cars) > 1:
             wall_car_orange = [car for car in state_wrapper.cars if car.team_num == 1][0]
             # orange car setup

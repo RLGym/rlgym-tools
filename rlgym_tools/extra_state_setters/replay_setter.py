@@ -19,6 +19,14 @@ class ReplaySetter(StateSetter):
             self.states = ndarray_or_file
         elif isinstance(ndarray_or_file, str):
             self.states = np.load(ndarray_or_file)
+        self.probabilities = self.generate_probabilities()
+
+    def generate_probabilities(self):
+        """
+        Generates probabilities for each state.
+        :return: Numpy array of probabilities (summing to 1)
+        """
+        return np.ones(len(self.states)) / len(self.states)
 
     @classmethod
     def construct_from_replays(cls, paths_to_replays: List[str], frame_skip: int = 150):
@@ -37,7 +45,7 @@ class ReplaySetter(StateSetter):
         states = []
         for replay in paths_to_each_replay:
             replay_iterator = convert_replay(replay)
-            remainder = random.randint(0, frame_skip)  # Vary the delays slightly
+            remainder = random.randint(0, frame_skip - 1)  # Vary the delays slightly
             for i, value in enumerate(replay_iterator):
                 if i % frame_skip == remainder:
                     game_state, _ = value
@@ -71,7 +79,7 @@ class ReplaySetter(StateSetter):
         :param state_wrapper: StateWrapper object to be modified with desired state values.
         """
 
-        data = self.states[np.random.randint(0, len(self.states))]
+        data = self.states[np.random.choice(len(self.states), p=self.probabilities)]
         assert len(data) == len(state_wrapper.cars) * 13 + 9, "Data given does not match current game mode"
         self._set_ball(state_wrapper, data)
         self._set_cars(state_wrapper, data)

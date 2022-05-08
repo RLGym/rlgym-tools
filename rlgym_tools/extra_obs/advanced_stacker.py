@@ -8,8 +8,7 @@ from collections import deque
 
 class AdvancedStacker(ObsBuilder):
     """
-    Alternative observation to AdvancedObs that stacks AdvancedObs of the same info as in AdvancedObs and also actions
-    that led into those observations.
+    Alternative observation to AdvancedObs. Stacks past stack_size actions and appends them to AdvancedObs. If there were no previous actions, zeros are assumed as previous actions.
 
     :param stack_size: number of frames to stack
     """
