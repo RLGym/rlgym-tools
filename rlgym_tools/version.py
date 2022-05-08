@@ -5,9 +5,18 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '1.6.6'
+__version__ = '1.7.0'
 
 release_notes = {
+    '1.7.0':
+        """
+        - Add AdvancedObsPadder (Impossibum)
+        - Add JumpTouchReward (Impossibum)
+        - Fix NameError in KickoffReward (benjamincburns)
+        - Add generate_probabilities as a method to ReplaySetter (Rolv)
+        - Upgrade WallSetter (Soren) and fix bug when num_cars == 1 (Kaiyotech)
+        - Add max overtime to GameCondition (Rolv)
+        """
     '1.6.6':
         """
         -WallStateSetter now has airdribble setups and harder wall plays
