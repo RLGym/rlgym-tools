@@ -36,8 +36,9 @@ class GameCondition(TerminalCondition):  # Mimics a Rocket League game
                 self.timer += self.tick_skip / 120
                 self.done = False
         else:
-            if self.timer <= 0 and current_state.ball.position[2] <= 100:
-                # Can't detect ball on ground directly, should be an alright approximation
+            if self.timer <= 0 and current_state.ball.position[2] <= 110:
+                # Can't detect ball on ground directly, should be an alright approximation.
+                # Anything below z vel of ~690uu/s should be detected. 50% for 1380 etc.
                 if differential != 0:
                     self.done = True
                 else:
