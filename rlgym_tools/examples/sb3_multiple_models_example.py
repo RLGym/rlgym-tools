@@ -39,7 +39,7 @@ if __name__ == '__main__':
             tick_skip=frame_skip,
             # use the MultiModelReward to handle the distribution of rewards to each model.
             reward_function=MultiModelReward(model_map, reward_funcs),
-            self_play=True,
+            spawn_opponents=True,
             terminal_conditions=[TimeoutCondition(round(fps * 15)), GoalScoredCondition()],  # Some basic terminals
             obs_builder=AdvancedObs(),  # Not that advanced, good default
             state_setter=DefaultState(),
