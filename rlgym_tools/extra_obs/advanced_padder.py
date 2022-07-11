@@ -109,7 +109,8 @@ class AdvancedObsPadder(ObsBuilder):
             [player.boost_amount,
              int(player.on_ground),
              int(player.has_flip),
-             int(player.is_demoed)]])
+             int(player.is_demoed),
+             int(player.has_jump)]])
 
         return player_car
 
