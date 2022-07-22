@@ -21,9 +21,9 @@ class WallPracticeState(StateSetter):
         self.side_high_odds = side_high_odds
 
     def reset(self, state_wrapper: StateWrapper):
-        choice_list = [0] * int(self.air_dribble_odds * 100) + \
-                      [1] * int(self.backboard_roll_odds * 100) + \
-                      [2] * int(self.side_high_odds * 100)
+        choice_list = [0] * int(self.backboard_roll_odds * 100) + \
+                      [1] * int(self.side_high_odds * 100) + \
+                      [2] * int(self.air_dribble_odds * 100)
         scenario_pick = random.choice(choice_list)
 
         if scenario_pick == 0:
