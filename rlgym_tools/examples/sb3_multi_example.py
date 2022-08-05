@@ -26,7 +26,7 @@ if __name__ == '__main__':  # Required for multiprocessing
             team_size=3,  # 3v3 to get as many agents going as possible, will make results more noisy
             tick_skip=frame_skip,
             reward_function=VelocityPlayerToBallReward(),  # Simple reward since example code
-            self_play=True,
+            spawn_opponents=True,
             terminal_conditions=[TimeoutCondition(round(fps * 30)), GoalScoredCondition()],  # Some basic terminals
             obs_builder=AdvancedObs(),  # Not that advanced, good default
             state_setter=DefaultState(),  # Resets to kickoff position
