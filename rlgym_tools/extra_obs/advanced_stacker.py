@@ -3,12 +3,11 @@ from typing import Any, List
 from rlgym.utils import common_values
 from rlgym.utils.gamestates import PlayerData, GameState, PhysicsObject
 from rlgym.utils.obs_builders import ObsBuilder
-from collections import deque
 
 
 class AdvancedStacker(ObsBuilder):
     """
-    Alternative observation to AdvancedObs. Stacks past stack_size actions and appends them to AdvancedObs. If there were no previous actions, zeros are assumed as previous actions.
+    Alternative observation to AdvancedObs. action_stacks past stack_size actions and appends them to AdvancedObs. If there were no previous actions, zeros are assumed as previous actions.
 
     :param stack_size: number of frames to stack
     """
@@ -18,22 +17,23 @@ class AdvancedStacker(ObsBuilder):
         self.POS_STD = 6000
         self.VEL_STD = 3000
         self.ANG_STD = 5.5
-        self.default_action = [0, 0, 0, 0, 0, 0, 0, 0]
+        self.default_action = np.zeros(common_values.NUM_ACTIONS)
         self.stack_size = stack_size
-        self.action_stack = [deque([], maxlen=self.stack_size) for _ in range(66)]
-        for i in range(len(self.action_stack)):
-            self.blank_stack(i)
+        self.action_stacks = {}
+        self.action_size = self.default_action.shape[0]
 
-    def blank_stack(self, index: int) -> None:
-        for _ in range(self.stack_size):
-            self.action_stack[index].appendleft(self.default_action)
+    def blank_stack(self, car_id: int) -> None:
 
-    def add_action_to_stack(self, new_action: np.ndarray, index: int):
-        self.action_stack[index].appendleft(new_action)
+    def add_action_to_stack(self, new_action: np.ndarray, car_id: int):
+        stack = self.action_stacks[car_id]
+        stack[self.action_size:] = stack[:-self.action_size]
+        stack[:self.action_size] = new_action
 
     def reset(self, initial_state: GameState):
+        self.action_stacks = {}
         for p in initial_state.players:
-            self.blank_stack(p.car_id)
+            self.action_stacks[p.car_id] = np.concatenate([default_action] * stack_size
+            
 
     def build_obs(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> Any:
         self.add_action_to_stack(previous_action, player.car_id)
@@ -55,7 +55,7 @@ class AdvancedStacker(ObsBuilder):
             pads,
         ]
 
-        obs.extend(list(self.action_stack[player.car_id]))
+        obs.extend(list(self.action_stacks[player.car_id]))
 
         player_car = self._add_player_to_obs(obs, player, ball, inverted)
 
