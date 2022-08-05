@@ -10,15 +10,21 @@ DEG_TO_RAD = 3.14159265 / 180
 
 class WallPracticeState(StateSetter):
 
-    def __init__(self):
+    def __init__(self, air_dribble_odds=1/3, backboard_roll_odds=1/3, side_high_odds=1/3):
         """
         WallPracticeState to setup wall practice
-
         """
         super().__init__()
 
+        self.air_dribble_odds = air_dribble_odds
+        self.backboard_roll_odds = backboard_roll_odds
+        self.side_high_odds = side_high_odds
+
     def reset(self, state_wrapper: StateWrapper):
-        scenario_pick = random.randrange(3)
+        choice_list = [0] * int(self.backboard_roll_odds * 100) + \
+                      [1] * int(self.side_high_odds * 100) + \
+                      [2] * int(self.air_dribble_odds * 100)
+        scenario_pick = random.choice(choice_list)
 
         if scenario_pick == 0:
             self._short_goal_roll(state_wrapper)
@@ -102,7 +108,6 @@ class WallPracticeState(StateSetter):
 
         wall_car_blue = [car for car in state_wrapper.cars if car.team_num == 0][0]
 
-
         #blue car setup
         blue_pitch_rot = 0 * DEG_TO_RAD
         blue_yaw_rot = 90 * DEG_TO_RAD
@@ -115,6 +120,7 @@ class WallPracticeState(StateSetter):
         wall_car_blue.set_pos(blue_x, blue_y, blue_z)
         wall_car_blue.boost = 100
 
+        #orange car setup
         wall_car_orange = None
         if len(state_wrapper.cars) > 1:
             wall_car_orange = [car for car in state_wrapper.cars if car.team_num == 1][0]
@@ -145,6 +151,7 @@ class WallPracticeState(StateSetter):
         :param state_wrapper:
         :return:
         """
+
         if len(state_wrapper.cars) > 1:
             defense_team = random.randrange(2)
         else:
@@ -177,7 +184,6 @@ class WallPracticeState(StateSetter):
 
         wall_car = [car for car in state_wrapper.cars if car.team_num == defense_team][0]
 
-
         wall_car_x = (2000 - random.randrange(500)) * side_inverter
         wall_car_y = 5120 * defense_inverter
         wall_car_z = 1000 + (random.randrange(500) - 500)
@@ -188,7 +194,6 @@ class WallPracticeState(StateSetter):
         wall_roll_rot = -90 * defense_inverter * DEG_TO_RAD
         wall_car.set_rot(wall_pitch_rot, wall_yaw_rot, wall_roll_rot)
         wall_car.boost = 25
-
 
         if len(state_wrapper.cars) > 1:
             challenge_car = [car for car in state_wrapper.cars if car.team_num != defense_team][0]
