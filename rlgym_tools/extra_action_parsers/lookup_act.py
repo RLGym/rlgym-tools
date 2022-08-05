@@ -7,7 +7,7 @@ from rlgym.utils.action_parsers import ActionParser
 from rlgym.utils.gamestates import GameState
 
 
-class FlatAction(ActionParser):
+class LookupAction(ActionParser):
     def __init__(self, bins=None):
         super().__init__()
         if bins is None:
