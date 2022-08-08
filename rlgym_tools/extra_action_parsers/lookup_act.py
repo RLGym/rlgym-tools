@@ -15,8 +15,8 @@ class LookupAction(ActionParser):
         elif isinstance(bins[0], (float, int)):
             self.bins = [bins[0]] * 5
         else:
+            assert len(bins) == 5, "Need bins for throttle, steer, pitch, yaw and roll"
             self.bins = bins
-        assert len(bins) == 5, "Need bins for throttle, steer, pitch, yaw and roll"
         self._lookup_table = self.make_lookup_table(self.bins)
 
     @staticmethod
