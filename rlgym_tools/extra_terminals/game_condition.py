@@ -3,10 +3,11 @@ from rlgym.utils.gamestates import GameState
 
 
 class GameCondition(TerminalCondition):  # Mimics a Rocket League game
-    def __init__(self, tick_skip=8, seconds_left=300, forfeit_spg_limit=None, max_overtime=300):
+    def __init__(self, tick_skip=8, seconds_left=300, seconds_per_goal_forfeit=None,
+                 max_overtime_seconds=float("inf"), max_no_touch_seconds=float("inf")):
         # NOTE: Since game isn't reset to kickoff by default,
         # you need to keep this outside the main loop as well,
-        # checking the done variable after each GoalTerminal
+        # checking the done variable after each terminal
         super().__init__()
         self.tick_skip = tick_skip
         self.seconds_left = seconds_left
@@ -14,19 +15,30 @@ class GameCondition(TerminalCondition):  # Mimics a Rocket League game
         self.overtime = False
         self.done = True
         self.initial_state = None
-        self.forfeit_spg_limit = forfeit_spg_limit  # SPG = Seconds Per Goal
-        self.max_overtime = max_overtime
+        self.seconds_per_goal_forfeit = seconds_per_goal_forfeit  # SPG = Seconds Per Goal
+        self.max_overtime = max_overtime_seconds
+        self.max_no_touch = max_no_touch_seconds
+        self.last_touch = None
+        self.differential = None
 
     def reset(self, initial_state: GameState):
-        if self.done:
+        if self.done:  # New game
             self.timer = self.seconds_left
             self.initial_state = initial_state
             self.overtime = False
             self.done = False
+            self.last_touch = self.seconds_left
+            self.differential = 0
 
     def is_terminal(self, current_state: GameState) -> bool:
-        differential = (current_state.blue_score - self.initial_state.blue_score) \
-                       - (current_state.orange_score - self.initial_state.orange_score)
+        reset = False
+
+        differential = ((current_state.blue_score - self.initial_state.blue_score)
+                        - (current_state.orange_score - self.initial_state.orange_score))
+
+        if differential != self.differential:  # Goal scored
+            reset = True
+
         if self.overtime:
             if differential != 0:
                 self.done = True
@@ -43,12 +55,20 @@ class GameCondition(TerminalCondition):  # Mimics a Rocket League game
                     self.done = True
                 else:
                     self.overtime = True
+                    self.last_touch = self.timer  # Just for convenience
                     self.done = False
-            elif self.forfeit_spg_limit is not None \
-                    and abs(differential) >= 3 \
-                    and self.timer / abs(differential) < self.forfeit_spg_limit:
+                    reset = True
+            elif (self.seconds_per_goal_forfeit is not None
+                  and abs(differential) >= 3
+                  and self.timer / abs(differential) < self.seconds_per_goal_forfeit):
+                # Too few seconds per goal to realistically win
                 self.done = True
             else:
                 self.timer -= self.tick_skip / 120
 
-        return self.done
+        if abs(self.last_touch - self.timer) >= self.max_no_touch:
+            self.done = True
+
+        self.differential = differential
+
+        return reset or self.done
