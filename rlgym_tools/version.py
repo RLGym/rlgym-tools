@@ -5,9 +5,13 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '1.8.0'
+__version__ = '1.8.1'
 
 release_notes = {
+    '1.8.1': """
+        - Refactor GameCondition (Rolv, Impossibum)
+        - Fix a small mistake in LookupAction (Rolv)
+    """,
     '1.8.0': """
         - Add lookup parser as used by Nexto/Tecko (Rolv)
         - Add customizable odds to WallPracticeState (Soren)
