@@ -50,12 +50,10 @@ class GameCondition(TerminalCondition):  # Mimics a Rocket League game
                         self.overtime = True
                         self.done = False
                         return True
+                    
                 elif self.forfeit_spg_limit is not None \
                         and abs(differential) >= 3 \
                         and self.timer / abs(differential) < self.forfeit_spg_limit:
-                    self.done = True
-
-                elif self.timer <= 0:
                     self.done = True
 
                 else:
