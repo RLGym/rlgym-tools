@@ -1,24 +1,16 @@
 from typing import Tuple
-
-import numpy as np
-import ray
 from ray.rllib import MultiAgentEnv
 from ray.rllib.utils import override
 from ray.rllib.utils.typing import MultiAgentDict
-
 from rlgym.gym import Gym
-
-
-def _action_dict_to_numpy(action_dict: MultiAgentDict):
-    action_array = np.zeros((len(action_dict), 8))
-    for i, act in action_dict.items():
-        action_array[i][:] = act
-    return action_array
-
 
 class RLLibEnv(MultiAgentEnv):
     def __init__(self, env: Gym):
+        super().__init__()
         self.env = env
+        self.observation_space = env.observation_space
+        self.action_space = env.action_space
+        self._agent_ids = [i for i in range(env._match.agents)]
 
     @override(MultiAgentEnv)
     def reset(self) -> MultiAgentDict:
@@ -28,8 +20,7 @@ class RLLibEnv(MultiAgentEnv):
     @override(MultiAgentEnv)
     def step(self, action_dict: MultiAgentDict) -> \
             Tuple[MultiAgentDict, MultiAgentDict, MultiAgentDict, MultiAgentDict]:
-        action_array = _action_dict_to_numpy(action_dict)
-
+        action_array = [val for val in action_dict.values()]
         observations, rewards, done, info = self.env.step(action_array)
 
         obs_dict = {}
@@ -41,3 +32,7 @@ class RLLibEnv(MultiAgentEnv):
             rew_dict[i] = rew
             info_dict[i] = info
         return obs_dict, rew_dict, done_dict, info_dict
+
+    @override(MultiAgentEnv)
+    def action_space_sample(self, agent_ids: list = None) -> MultiAgentDict:
+        return {agent_id:self.action_space.sample() for agent_id in self._agent_ids}
