@@ -1,7 +1,7 @@
 from ray.rllib.algorithms.apex_dqn import ApexDQNConfig
 from test_marl_env import RLLibEnv
 from ray.tune import register_env
-from nexto_action_space import NectoActionParser
+from rlgym_tools.extra_action_parsers.lookup_act import LookupAction
 
 def make_env():
     import rlgym
@@ -9,7 +9,7 @@ def make_env():
     self_play = True
     n_agents = team_size*2 if self_play else team_size
 
-    env = rlgym.make(action_parser=NectoActionParser(n_agents),
+    env = rlgym.make(action_parser=LookupAction(),
                      team_size=team_size,
                      spawn_opponents=self_play,
                      use_injector=True)
