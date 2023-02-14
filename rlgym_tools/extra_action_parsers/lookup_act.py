@@ -13,7 +13,7 @@ class LookupAction(ActionParser):
         if bins is None:
             self.bins = [(-1, 0, 1)] * 5
         elif isinstance(bins[0], (float, int)):
-            self.bins = [bins[0]] * 5
+            self.bins = [bins] * 5
         else:
             assert len(bins) == 5, "Need bins for throttle, steer, pitch, yaw and roll"
             self.bins = bins
