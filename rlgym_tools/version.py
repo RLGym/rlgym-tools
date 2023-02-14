@@ -5,9 +5,13 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '1.8.1'
+__version__ = '1.8.2'
 
 release_notes = {
+    '1.8.2': """
+       - Fix no touch timer in GameCondition (Rolv)
+       - Update RLLib example (Aech)
+    """,
     '1.8.1': """
         - Refactor GameCondition (Rolv, Impossibum)
         - Fix a small mistake in LookupAction (Rolv)
