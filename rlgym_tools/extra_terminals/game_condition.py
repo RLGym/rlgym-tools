@@ -68,6 +68,8 @@ class GameCondition(TerminalCondition):  # Mimics a Rocket League game
 
         if abs(self.last_touch - self.timer) >= self.max_no_touch:
             self.done = True
+        elif any(p.ball_touched for p in current_state.players):
+            self.last_touch = self.timer
 
         self.differential = differential
 
