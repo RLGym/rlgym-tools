@@ -12,7 +12,7 @@ def _expand_cars(state_wrapper: StateWrapper, data: np.ndarray):
     num_cars_to_add = len(state_wrapper.cars) - num_cars_in_replay
     car_data = np.split(data[9:], num_cars_in_replay)
     item_positions = [data[:3]]
-    for i, car in car_data:
+    for i, car in enumerate(car_data):
         item_positions.append(car_data[i][:3])
     # longest dimension of any hitbox is 131.49 (breakout) so check 150 distance for safety
     for i in range(num_cars_to_add):
