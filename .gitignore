@@ -5,3 +5,4 @@ build
 dist
 rlgym_tools.egg-info
 testenv
+*.code-workspace
