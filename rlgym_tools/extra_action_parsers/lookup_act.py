@@ -51,4 +51,5 @@ class LookupAction(ActionParser):
 
     def parse_actions(self, actions: Any, state: GameState) -> np.ndarray:
         indexes = np.array(actions, dtype=np.int32)
+        indexes = np.squeeze(indexes)
         return self._lookup_table[indexes]
