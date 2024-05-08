@@ -5,9 +5,12 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '1.8.3'
+__version__ = '2.0.0'
 
 release_notes = {
+    '2.0.0': """
+       - Move to RLGym v2
+    """,
     '1.8.3': """
        - Update parse_actions in lookup_act.py (Jeff)
     """,
