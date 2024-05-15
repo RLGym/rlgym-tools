@@ -1,5 +1,6 @@
 from rlgym.utils import RewardFunction
 from rlgym.utils.gamestates import PlayerData, GameState
+import numpy as np
 
 class JumpTouchReward(RewardFunction):
     """
