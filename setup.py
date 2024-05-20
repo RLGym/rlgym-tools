@@ -28,4 +28,5 @@ setup(
         'Programming Language :: Python :: 3',
         "Operating System :: Microsoft :: Windows",
     ],
+    include_package_data=True,  # For MANIFEST.in
 )
