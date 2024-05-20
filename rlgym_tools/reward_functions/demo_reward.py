@@ -11,7 +11,7 @@ class DemoReward(RewardFunction[AgentID, GameState, float]):
         self.attacker_reward = attacker_reward
         self.victim_punishment = victim_punishment
 
-    def reset(self, initial_state: GameState, shared_info: Dict[str, Any]) -> None:
+    def reset(self, agents: List[AgentID], initial_state: GameState, shared_info: Dict[str, Any]) -> None:
         return
 
     def get_rewards(self, agents: List[AgentID], state: GameState, is_terminated: Dict[AgentID, bool],

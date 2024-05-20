@@ -1,15 +1,7 @@
 import math
 
 import numpy as np
-from rlgym.rocket_league.common_values import BACK_WALL_Y, BALL_RADIUS, GOAL_HEIGHT, GOAL_CENTER_TO_POST
-
-
-def closest_point_in_goal(ball_pos):
-    # Find the closest point on each goal to the ball
-    x = math.copysign(1, ball_pos[0]) * min(abs(ball_pos[0]), GOAL_CENTER_TO_POST - BALL_RADIUS)
-    y = BACK_WALL_Y + BALL_RADIUS
-    z = min(ball_pos[2], GOAL_HEIGHT - BALL_RADIUS)
-    return np.array([x, y, z])
+from rlgym.rocket_league.common_values import BALL_RADIUS, GOAL_HEIGHT, GOAL_CENTER_TO_POST
 
 
 def solid_angle_eriksson(O, A, B, C):
@@ -26,14 +18,16 @@ def solid_angle_eriksson(O, A, B, C):
     return E
 
 
-def view_goal_ratio(pos, goal_y):
+def view_goal_ratio(pos, goal_y, margin=BALL_RADIUS):
     # Calculate the percent of the field of view that the goal takes up
-    max_x = GOAL_CENTER_TO_POST - BALL_RADIUS
-    max_y = GOAL_HEIGHT - BALL_RADIUS
-    bl = np.array([-max_x, goal_y, BALL_RADIUS])
-    br = np.array([max_x, goal_y, BALL_RADIUS])
-    tl = np.array([-max_x, goal_y, max_y])
-    tr = np.array([max_x, goal_y, max_y])
+    max_x = GOAL_CENTER_TO_POST - margin
+    min_x = -max_x
+    max_z = GOAL_HEIGHT - margin
+    min_z = margin
+    bl = np.array([min_x, goal_y, min_z])
+    br = np.array([max_x, goal_y, min_z])
+    tl = np.array([min_x, goal_y, max_z])
+    tr = np.array([max_x, goal_y, max_z])
     solid_angle_1 = solid_angle_eriksson(pos, bl, br, tl)
     solid_angle_2 = solid_angle_eriksson(pos, br, tr, tl)
     return (solid_angle_1 + solid_angle_2) / (4 * math.pi)

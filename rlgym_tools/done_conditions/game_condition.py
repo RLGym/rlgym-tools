@@ -5,59 +5,44 @@ from rlgym.rocket_league.api import GameState
 from rlgym.rocket_league.common_values import BLUE_TEAM, BALL_RADIUS
 from rlgym.rocket_league.common_values import TICKS_PER_SECOND
 
+from rlgym_tools.shared_info_providers.scoreboard_provider import ScoreboardInfo
+
 
 class GameCondition(DoneCondition[AgentID, GameState]):
-    def __init__(self, game_duration_seconds: int, seconds_per_goal_forfeit=None, max_overtime_seconds=None):
-        self.game_duration_seconds = game_duration_seconds
-        self.seconds_left = game_duration_seconds
-        self.is_overtime = False
+    """
+    Simulates a Rocket League game, ending when:
+    - A goal is scored
+    - The ball hits the ground at 0 seconds
+    - The overtime exceeds the maximum allowed time
+    - The scoreline is presumed to be insurmountable, leading to a forfeit
+    """
+
+    def __init__(self, seconds_per_goal_forfeit=None, max_overtime_seconds=None):
         self.seconds_per_goal_forfeit = seconds_per_goal_forfeit
         self.max_overtime_seconds = max_overtime_seconds
-        self.scoreline = (0, 0)
-        self.prev_state = None
+        self.overtime_duration = 0
 
-    def reset(self, initial_state: GameState, shared_info: Dict[str, Any]) -> None:
-        self.seconds_left = self.game_duration_seconds
-        self.is_overtime = False
-        self.scoreline = (0, 0)
-        self.prev_state = initial_state
-        shared_info["scoreboard"] = {"scoreline": self.scoreline,
-                                     "is_overtime": self.is_overtime,
-                                     "seconds_left": self.seconds_left,
-                                     "go_to_kickoff": True}
+    def reset(self, agents: List[AgentID], initial_state: GameState, shared_info: Dict[str, Any]) -> None:
+        self.overtime_duration = 0
 
     def is_done(self, agents: List[AgentID], state: GameState, shared_info: Dict[str, Any]) -> Dict[AgentID, bool]:
-        ticks_passed = state.tick_count - self.prev_state.tick_count
-        self.seconds_left -= ticks_passed / TICKS_PER_SECOND
-        self.seconds_left = max(0, self.seconds_left)
-        dones = {agent: False for agent in agents}
-        go_to_kickoff = False
-        if state.goal_scored:
-            if self.is_overtime or self.seconds_left <= 0:
-                dones = {agent: True for agent in agents}
-            if state.scoring_team == BLUE_TEAM:
-                self.scoreline = (self.scoreline[0] + 1, self.scoreline[1])
-            else:
-                self.scoreline = (self.scoreline[0], self.scoreline[1] + 1)
-        elif self.seconds_left <= 0:
-            prev_ball = self.prev_state.ball
-            next_z = prev_ball.position[2] + ticks_passed * prev_ball.velocity[2] / TICKS_PER_SECOND
-            if next_z - BALL_RADIUS < 0:  # Ball would be below the ground
-                if self.scoreline[0] != self.scoreline[1]:
-                    dones = {agent: True for agent in agents}
-                else:
-                    go_to_kickoff = True
-                    self.is_overtime = True
-        elif self.seconds_per_goal_forfeit is not None:
-            goal_diff = abs(self.scoreline[0] - self.scoreline[1])
-            if goal_diff >= 3:
-                seconds_per_goal = self.seconds_left / goal_diff
-                if seconds_per_goal < self.seconds_per_goal_forfeit:  # Forfeit if it's not realistic to catch up
-                    dones = {agent: True for agent in agents}
+        scoreboard: ScoreboardInfo = shared_info["scoreboard"]
 
-        self.prev_state = state
-        shared_info["scoreboard"] = {"scoreline": self.scoreline,
-                                     "is_overtime": self.is_overtime,
-                                     "seconds_left": self.seconds_left,
-                                     "go_to_kickoff": go_to_kickoff}
-        return dones
+        done = False
+        if scoreboard.go_to_kickoff or scoreboard.is_over:
+            done = True
+        elif scoreboard.is_overtime:
+            self.overtime_duration += state.tick_count / TICKS_PER_SECOND
+            if self.max_overtime_seconds is not None and self.overtime_duration >= self.max_overtime_seconds:
+                scoreboard.is_over = True
+                done = True
+        else:
+            if self.seconds_per_goal_forfeit is not None:
+                goal_diff = abs(scoreboard.blue_score - scoreboard.orange_score)
+                if goal_diff >= 3:
+                    seconds_per_goal = scoreboard.game_timer_seconds / goal_diff
+                    if seconds_per_goal < self.seconds_per_goal_forfeit:  # Forfeit if it's not realistic to catch up
+                        scoreboard.is_over = True
+                        done = True
+
+        return {agent: done for agent in agents}

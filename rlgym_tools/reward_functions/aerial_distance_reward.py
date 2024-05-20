@@ -29,8 +29,8 @@ class AerialDistanceReward(RewardFunction[AgentID, GameState, float]):
         self.last_touch_agent = None
         self.prev_state = None
 
-    def reset(self, initial_state: GameState, shared_info: Dict[str, Any]) -> None:
-        self.distances = {k: 0 for k in initial_state.cars.keys()}
+    def reset(self, agents: List[AgentID], initial_state: GameState, shared_info: Dict[str, Any]) -> None:
+        self.distances = {k: 0 for k in agents}
         self.last_touch_agent = None
         self.prev_state = initial_state
 

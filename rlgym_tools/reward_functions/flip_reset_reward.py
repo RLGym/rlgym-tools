@@ -9,7 +9,7 @@ class FlipResetReward(RewardFunction[AgentID, GameState, float]):
     def __init__(self):
         self.prev_state = None
 
-    def reset(self, initial_state: GameState, shared_info: Dict[str, Any]) -> None:
+    def reset(self, agents: List[AgentID], initial_state: GameState, shared_info: Dict[str, Any]) -> None:
         self.prev_state = initial_state
 
     def get_rewards(self, agents: List[AgentID], state: GameState, is_terminated: Dict[AgentID, bool],

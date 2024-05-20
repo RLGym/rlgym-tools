@@ -11,8 +11,8 @@ class TeamSpiritRewardWrapper(RewardFunction[AgentID, GameState, float]):
         self.reward_fn = reward_fn
         self.team_spirit = team_spirit
 
-    def reset(self, initial_state: GameState, shared_info: Dict[str, Any]) -> None:
-        self.reward_fn.reset(initial_state, shared_info)
+    def reset(self, agents: List[AgentID], initial_state: GameState, shared_info: Dict[str, Any]) -> None:
+        self.reward_fn.reset(agents, initial_state, shared_info)
 
     def get_rewards(self, agents: List[AgentID], state: GameState, is_terminated: Dict[AgentID, bool],
                     is_truncated: Dict[AgentID, bool], shared_info: Dict[str, Any]) -> Dict[AgentID, float]:

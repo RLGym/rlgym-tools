@@ -1,25 +1,35 @@
-from dataclasses import dataclass
+import math
+from dataclasses import dataclass, asdict, replace
 from typing import List, Dict, Any
 
 from rlgym.api import SharedInfoProvider, AgentID
 from rlgym.rocket_league.api import GameState, PhysicsObject
 from rlgym.rocket_league.common_values import TICKS_PER_SECOND, GRAVITY, BLUE_TEAM
 
+from rlgym_tools.math.ball import ball_hit_ground
+
 PRE_MATCH = 0
-KICKOFF = 1
-REGULATION = 2
-OVERTIME = 3
-POST_MATCH = 4
-
-BALL_RESTING_HEIGHT = 93.15
+REGULATION = 1
+OVERTIME = 2
+POST_MATCH = 3
 
 
-@dataclass
+@dataclass(slots=True)
 class ScoreboardInfo:
-    seconds_remaining: float
+    game_timer_seconds: float
+    kickoff_timer_seconds: float
     blue_score: int
     orange_score: int
-    game_state: int
+    go_to_kickoff: bool
+    is_over: bool
+
+    @property
+    def is_overtime(self):
+        return math.isinf(self.game_timer_seconds) and self.blue_score == self.orange_score
+
+    @property
+    def is_kickoff(self):
+        return self.kickoff_timer_seconds > 0
 
 
 class ScoreboardProvider(SharedInfoProvider[AgentID, GameState]):
@@ -28,77 +38,85 @@ class ScoreboardProvider(SharedInfoProvider[AgentID, GameState]):
     It tracks:
     - The current scoreline
     - The time remaining
-    - The current game state (e.g. overtime, kickoff)
+    - The time remaining until kickoff buffer ends
+    - Whether the game should go to kickoff
+    - Whether the game is over
     """
 
-    def __init__(self, game_length_seconds: float = 300.0):
+    def __init__(self, game_length_seconds: float = 300.0, kickoff_timer_seconds: float = 5.0):
         self.game_length_seconds = game_length_seconds
-        self.ticks_remaining = game_length_seconds * TICKS_PER_SECOND
-        self.blue_score = 0
-        self.orange_score = 0
-        self.game_state = PRE_MATCH
+        self.kickoff_timer_seconds = kickoff_timer_seconds
 
-    def get_info(self):
-        info = ScoreboardInfo(self.ticks_remaining * TICKS_PER_SECOND,
-                              self.blue_score, self.orange_score,
-                              self.game_state)
-        return info
+        self.info = ScoreboardInfo(
+            game_timer_seconds=game_length_seconds,
+            kickoff_timer_seconds=kickoff_timer_seconds,
+            blue_score=0,
+            orange_score=0,
+            go_to_kickoff=True,
+            is_over=False,
+        )
 
     def create(self, shared_info: Dict[str, Any]) -> Dict[str, Any]:
-        self.game_state = PRE_MATCH
-        self.blue_score = 0
-        self.orange_score = 0
-        self.ticks_remaining = self.game_length_seconds * TICKS_PER_SECOND
-        shared_info["scoreboard"] = self.get_info()
+        if "scoreboard" not in shared_info:
+            # Default behavior is infinite overtime, basically the same as no scoreboard
+            shared_info["scoreboard"] = ScoreboardInfo(
+                game_timer_seconds=math.inf,
+                kickoff_timer_seconds=0.,
+                blue_score=0,
+                orange_score=0,
+                go_to_kickoff=False,
+                is_over=False,
+            )
         return shared_info
 
     def set_state(self, agents: List[AgentID], initial_state: GameState, shared_info: Dict[str, Any]) -> Dict[str, Any]:
-        if initial_state.ball.position[1] == 0:
-            self.game_state = KICKOFF
-        else:
-            self.game_state = REGULATION
+        info = shared_info.get("scoreboard")
+        if info is None:
+            raise ValueError("ScoreboardProvider requires a 'scoreboard' key in shared_info")
 
-    @staticmethod
-    def ball_hit_ground(ticks_passed: int, ball: PhysicsObject):
-        z = ball.position[2] - BALL_RESTING_HEIGHT
-        if z < 0:
-            return True
+        if isinstance(info, dict):
+            info = ScoreboardInfo(**info)
 
-        vz = ball.linear_velocity[2]
+        assert not any(v is None for v in asdict(info).values()), "ScoreboardInfo must be fully defined"
 
-        # Reverse the trajectory to find the time of impact
-        g = GRAVITY
-        a = -0.5 * g
-        b = vz
-        c = z
-        discriminant = b ** 2 - 4 * a * c
-        if discriminant < 0:
-            return False
-        t = (-b - discriminant ** 0.5) / (2 * a)  # Negative solution since we're looking for the past
-        if -ticks_passed / TICKS_PER_SECOND <= t <= 0:
-            return True
-        return False
+        if info.is_over:
+            raise ValueError("Cannot set scoreboard to be over")
+
+        self.info = info
+
+        shared_info["scoreboard"] = info
+        return shared_info
 
     def step(self, agents: List[AgentID], state: GameState, shared_info: Dict[str, Any]) -> Dict[str, Any]:
         ticks_passed = state.tick_count
 
-        if self.game_state == REGULATION:
-            self.ticks_remaining -= ticks_passed
-            self.ticks_remaining = max(0, self.ticks_remaining)
+        # Copy info into new object to avoid modifying in place
+        info = replace(self.info)
 
         if state.goal_scored:
             if state.scoring_team == BLUE_TEAM:
-                self.blue_score += 1
+                info.blue_score += 1
             else:
-                self.orange_score += 1
+                info.orange_score += 1
+            info.go_to_kickoff = True
 
-        if self.ticks_remaining <= 0:
-            if self.ball_hit_ground(ticks_passed, state.ball) or state.goal_scored:
-                if self.blue_score == self.orange_score:
-                    self.game_state = OVERTIME
-                    self.ticks_remaining = float("inf")
+        if info.kickoff_timer_seconds > 0 and state.ball.position[2] == 0:
+            info.kickoff_timer_seconds -= ticks_passed
+            if info.kickoff_timer_seconds <= 0:
+                info.kickoff_timer_seconds = 0
+        else:
+            info.kickoff_timer_seconds = 0
+            info.game_timer_seconds -= ticks_passed
+
+        if info.game_timer_seconds <= 0:
+            info.game_timer_seconds = 0
+            if ball_hit_ground(ticks_passed, state.ball) or state.goal_scored:
+                if info.blue_score == info.orange_score:
+                    info.game_timer_seconds = math.inf
+                    info.go_to_kickoff = True
                 else:
-                    self.game_state = POST_MATCH
+                    info.is_over = True
 
-        shared_info["scoreboard"] = self.get_info()
+        self.info = info
+        shared_info["scoreboard"] = self.info
         return shared_info

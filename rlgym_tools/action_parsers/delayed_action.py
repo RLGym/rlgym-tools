@@ -1,4 +1,4 @@
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, List
 
 import numpy as np
 from rlgym.api import ActionParser, AgentID, ActionType, EngineActionType, SpaceType
@@ -21,8 +21,8 @@ class DelayedAction(ActionParser[AgentID, np.ndarray, np.ndarray, GameState, Tup
     def get_action_space(self, agent: AgentID) -> SpaceType:
         return self.parser.get_action_space(agent)
 
-    def reset(self, initial_state: GameState, shared_info: Dict[str, Any]) -> None:
-        self.parser.reset(initial_state, shared_info)
+    def reset(self, agents: List[AgentID], initial_state: GameState, shared_info: Dict[str, Any]) -> None:
+        self.parser.reset(agents, initial_state, shared_info)
         self.action_queue = {k: [] for k in initial_state.cars.keys()}
         self.is_initial = True
         shared_info["action_queue"] = self.action_queue
