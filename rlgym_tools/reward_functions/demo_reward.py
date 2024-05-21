@@ -16,9 +16,8 @@ class DemoReward(RewardFunction[AgentID, GameState, float]):
 
     def get_rewards(self, agents: List[AgentID], state: GameState, is_terminated: Dict[AgentID, bool],
                     is_truncated: Dict[AgentID, bool], shared_info: Dict[str, Any]) -> Dict[AgentID, float]:
-        rewards = {}
+        rewards = {agent: 0 for agent in agents}
         for agent in agents:
-            rewards[agent] = 0
             victim = state.cars[agent].bump_victim_id
             if victim is not None:
                 if state.cars[victim].demo_respawn_timer > 0:

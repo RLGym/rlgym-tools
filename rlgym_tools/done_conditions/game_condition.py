@@ -21,9 +21,11 @@ class GameCondition(DoneCondition[AgentID, GameState]):
         self.seconds_per_goal_forfeit = seconds_per_goal_forfeit
         self.max_overtime_seconds = max_overtime_seconds
         self.overtime_duration = 0
+        self.last_ticks = None
 
     def reset(self, agents: List[AgentID], initial_state: GameState, shared_info: Dict[str, Any]) -> None:
         self.overtime_duration = 0
+        self.last_ticks = initial_state.tick_count
 
     def is_done(self, agents: List[AgentID], state: GameState, shared_info: Dict[str, Any]) -> Dict[AgentID, bool]:
         scoreboard: ScoreboardInfo = shared_info["scoreboard"]
@@ -32,7 +34,7 @@ class GameCondition(DoneCondition[AgentID, GameState]):
         if scoreboard.go_to_kickoff or scoreboard.is_over:
             done = True
         elif scoreboard.is_overtime:
-            self.overtime_duration += state.tick_count / TICKS_PER_SECOND
+            self.overtime_duration += (state.tick_count - self.last_ticks) / TICKS_PER_SECOND
             if self.max_overtime_seconds is not None and self.overtime_duration >= self.max_overtime_seconds:
                 scoreboard.is_over = True
                 done = True
@@ -44,5 +46,7 @@ class GameCondition(DoneCondition[AgentID, GameState]):
                     if seconds_per_goal < self.seconds_per_goal_forfeit:  # Forfeit if it's not realistic to catch up
                         scoreboard.is_over = True
                         done = True
+
+        self.last_ticks = state.tick_count
 
         return {agent: done for agent in agents}

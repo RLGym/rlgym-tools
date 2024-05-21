@@ -5,7 +5,7 @@ from rlgym.rocket_league.api import GameState
 
 
 class ConfigMutator(StateMutator[GameState]):
-    def __init__(self, gravity: float = 1.0, boost_consumption: float = 1.0, dodge_deadzone: float = 1.0):
+    def __init__(self, gravity: float = 1.0, boost_consumption: float = 1.0, dodge_deadzone: float = 0.5):
         self.gravity = gravity
         self.boost_consumption = boost_consumption
         self.dodge_deadzone = dodge_deadzone

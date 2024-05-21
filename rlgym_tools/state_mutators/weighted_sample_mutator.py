@@ -13,7 +13,7 @@ class WeightedSampleMutator(StateMutator[GameState]):
         self.probs = weights / weights.sum()
 
     @staticmethod
-    def from_zipped(mutator_weights: Sequence[Tuple[StateMutator, float]]):
+    def from_zipped(*mutator_weights: Tuple[StateMutator, float]):
         mutators, weights = zip(*mutator_weights)
         return WeightedSampleMutator(mutators, weights)
 

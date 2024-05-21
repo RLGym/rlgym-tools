@@ -25,13 +25,16 @@ class AugmentMutator(StateMutator[GameState]):
     @staticmethod
     def shuffle_players(state):
         for team in BLUE_TEAM, ORANGE_TEAM:
-            agents = [agent for agent, car in state.cars.items() if car.team == team]
-            from_agent = list(agents)
-            to_agent = list(agents)
-            random.shuffle(to_agent)
-            mapping = dict(zip(from_agent, to_agent))
+            agents = [agent for agent, car in state.cars.items() if car.team_num == team]
+            if len(agents) == 1:
+                continue
+            from_agents = list(agents)
+            to_agents = list(agents)
+            random.shuffle(to_agents)
+            mapping = dict(zip(from_agents, to_agents))
+            original_cars = {k: v for k, v in state.cars.items()}
             for from_agent, to_agent in mapping.items():
-                from_car = state.cars.pop(from_agent)
+                from_car = original_cars.pop(from_agent)
                 if from_car.bump_victim_id is not None:
                     from_car.bump_victim_id = mapping[from_car.bump_victim_id]
                 state.cars[to_agent] = from_car
@@ -41,7 +44,7 @@ class AugmentMutator(StateMutator[GameState]):
         for car in state.cars.values():
             car.team_num = BLUE_TEAM if car.team_num == ORANGE_TEAM else ORANGE_TEAM
             car.physics.position[1] *= -1
-            car.physics.velocity[1] *= -1
+            car.physics.linear_velocity[1] *= -1
             car.physics.angular_velocity[0] *= -1
             car.physics.angular_velocity[2] *= -1
             rot_mtx = car.physics.rotation_mtx.copy()
@@ -56,7 +59,7 @@ class AugmentMutator(StateMutator[GameState]):
     def mirror_across_y(state):  # Across y-axis, meaning x-axis is inverted
         for car in state.cars.values():
             car.physics.position[0] *= -1
-            car.physics.velocity[0] *= -1
+            car.physics.linear_velocity[0] *= -1
             car.physics.angular_velocity[1] *= -1
             car.physics.angular_velocity[2] *= -1
             rot_mtx = car.physics.rotation_mtx.copy()

@@ -207,7 +207,7 @@ class ParsedReplay:
                 state.ball.quaternion = np.array((ball_row.quat_w, ball_row.quat_x,
                                                   ball_row.quat_y, ball_row.quat_z))
 
-                state.tick_count = game_row.delta * TICKS_PER_SECOND
+                state.tick_count = game_row.time * TICKS_PER_SECOND
                 state.goal_scored = frame == goal_frame
                 state.config = game_config
 
@@ -285,7 +285,7 @@ class ParsedReplay:
                 if frame == end_frame:
                     break
 
-                ticks = round(game_tuples[i + 1].delta * TICKS_PER_SECOND)
+                ticks = round(game_tuples[i + 1].time * TICKS_PER_SECOND - state.tick_count)
                 for uid, action in actions.items():
                     actions[uid] = action.reshape(1, -1).repeat(ticks, axis=0)
                 transition_engine.set_state(state, {})

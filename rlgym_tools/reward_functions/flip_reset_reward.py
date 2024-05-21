@@ -23,7 +23,7 @@ class FlipResetReward(RewardFunction[AgentID, GameState, float]):
                     car_ball = state.ball.position - car.physics.position
                     car_ball = car_ball / np.linalg.norm(car_ball)
                     cossim_down_ball = np.dot(down, car_ball)
-                    if cossim_down_ball < 0.5 ** 0.5:  # 45 degrees
+                    if cossim_down_ball > 0.5 ** 0.5:  # 45 degrees
                         rewards[agent] = 1
         self.prev_state = state
         return rewards

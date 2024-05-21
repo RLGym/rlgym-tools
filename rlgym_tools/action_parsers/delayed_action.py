@@ -1,7 +1,7 @@
 from typing import Dict, Any, Tuple, List
 
 import numpy as np
-from rlgym.api import ActionParser, AgentID, ActionType, EngineActionType, SpaceType
+from rlgym.api import ActionParser, AgentID, ActionType, EngineActionType, ActionSpaceType
 from rlgym.rocket_league.api import GameState
 
 
@@ -18,7 +18,7 @@ class DelayedAction(ActionParser[AgentID, np.ndarray, np.ndarray, GameState, Tup
         self.action_queue = {}
         self.is_initial = True
 
-    def get_action_space(self, agent: AgentID) -> SpaceType:
+    def get_action_space(self, agent: AgentID) -> ActionSpaceType:
         return self.parser.get_action_space(agent)
 
     def reset(self, agents: List[AgentID], initial_state: GameState, shared_info: Dict[str, Any]) -> None:
@@ -35,9 +35,8 @@ class DelayedAction(ActionParser[AgentID, np.ndarray, np.ndarray, GameState, Tup
             for agent, action in parsed_actions.items():
                 self.action_queue[agent] = [action] * self.action_queue_size
             self.is_initial = False
-        else:
-            for agent, action in parsed_actions.items():
-                self.action_queue[agent].append(action)
-                returned_actions[agent] = self.action_queue[agent].pop(0)
+        for agent, action in parsed_actions.items():
+            self.action_queue[agent].append(action)
+            returned_actions[agent] = self.action_queue[agent].pop(0)
         shared_info["action_queue"] = self.action_queue
         return returned_actions

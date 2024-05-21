@@ -43,18 +43,9 @@ class ScoreboardProvider(SharedInfoProvider[AgentID, GameState]):
     - Whether the game is over
     """
 
-    def __init__(self, game_length_seconds: float = 300.0, kickoff_timer_seconds: float = 5.0):
-        self.game_length_seconds = game_length_seconds
-        self.kickoff_timer_seconds = kickoff_timer_seconds
-
-        self.info = ScoreboardInfo(
-            game_timer_seconds=game_length_seconds,
-            kickoff_timer_seconds=kickoff_timer_seconds,
-            blue_score=0,
-            orange_score=0,
-            go_to_kickoff=True,
-            is_over=False,
-        )
+    def __init__(self):
+        self.last_ticks = None
+        self.info = None
 
     def create(self, shared_info: Dict[str, Any]) -> Dict[str, Any]:
         if "scoreboard" not in shared_info:
@@ -65,7 +56,7 @@ class ScoreboardProvider(SharedInfoProvider[AgentID, GameState]):
                 blue_score=0,
                 orange_score=0,
                 go_to_kickoff=False,
-                is_over=False,
+                is_over=True,
             )
         return shared_info
 
@@ -84,11 +75,14 @@ class ScoreboardProvider(SharedInfoProvider[AgentID, GameState]):
 
         self.info = info
 
+        self.last_ticks = initial_state.tick_count
+
         shared_info["scoreboard"] = info
         return shared_info
 
     def step(self, agents: List[AgentID], state: GameState, shared_info: Dict[str, Any]) -> Dict[str, Any]:
-        ticks_passed = state.tick_count
+        ticks_passed = state.tick_count - self.last_ticks
+        self.last_ticks = state.tick_count
 
         # Copy info into new object to avoid modifying in place
         info = replace(self.info)
@@ -101,12 +95,12 @@ class ScoreboardProvider(SharedInfoProvider[AgentID, GameState]):
             info.go_to_kickoff = True
 
         if info.kickoff_timer_seconds > 0 and state.ball.position[2] == 0:
-            info.kickoff_timer_seconds -= ticks_passed
+            info.kickoff_timer_seconds -= ticks_passed / TICKS_PER_SECOND
             if info.kickoff_timer_seconds <= 0:
                 info.kickoff_timer_seconds = 0
         else:
             info.kickoff_timer_seconds = 0
-            info.game_timer_seconds -= ticks_passed
+            info.game_timer_seconds -= ticks_passed / TICKS_PER_SECOND
 
         if info.game_timer_seconds <= 0:
             info.game_timer_seconds = 0

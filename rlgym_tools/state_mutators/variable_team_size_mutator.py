@@ -34,4 +34,30 @@ class VariableTeamSizeMutator(StateMutator[GameState]):
         Users can override this to set default values.
         """
         car = Car()
+        car.hitbox_type = OCTANE
+
+        car.physics = PhysicsObject()
+
+        car.demo_respawn_timer = 0.
+        car.on_ground = True
+        car.supersonic_time = 0.
+        car.boost_amount = 0.
+        car.boost_active_time = 0.
+        car.handbrake = 0.
+
+        car.has_jumped = False
+        car.is_holding_jump = False
+        car.is_jumping = False
+        car.jump_time = 0.
+
+        car.has_flipped = False
+        car.has_double_jumped = False
+        car.air_time_since_jump = 0.
+        car.flip_time = 0.
+        car.flip_torque = np.zeros(3, dtype=np.float32)
+
+        car.is_autoflipping = False
+        car.autoflip_timer = 0.
+        car.autoflip_direction = 0.
+
         return car
