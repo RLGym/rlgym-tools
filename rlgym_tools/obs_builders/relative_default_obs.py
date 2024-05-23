@@ -52,7 +52,7 @@ class RelativeDefaultObs(ObsBuilder[AgentID, np.ndarray, GameState, Tuple[str, i
 
     def _build_obs(self, agent: AgentID, state: GameState, shared_info: Dict[str, Any]) -> np.ndarray:
         car = state.cars[agent]
-        if car.team_num == ORANGE_TEAM:
+        if car.is_orange:
             inverted = True
             ball = state.inverted_ball
             pads = state.inverted_boost_pad_timers

@@ -2,7 +2,6 @@ import json
 import os
 import subprocess
 import tempfile
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict
@@ -185,7 +184,7 @@ class ParsedReplay:
                 # Player physics info is repeated 1-3 times, so we need to remove those
                 if interpolate:
                     # Set interpolate cols to NaN if they are repeated
-                    pdf.loc[pdf["is_repeat"] == 1, interpolate_cols] = np.nan
+                    pdf.loc[is_repeat, interpolate_cols] = np.nan
                     pdf = pdf.interpolate()  # Note that this assumes equal time steps
                 player_dfs[uid] = pdf
 
@@ -195,7 +194,12 @@ class ParsedReplay:
             game_config.dodge_deadzone = 0.5
 
             game_tuples = list(game_df.itertuples())
-            player_rows = [list(pdf.itertuples()) for pdf in player_dfs.values()]
+            player_ids = []
+            player_rows = []
+            for pid, pdf in player_dfs.items():
+                player_ids.append(pid)
+                player_rows.append(list(pdf.itertuples()))
+
             for i, game_row, ball_row, car_rows in zip(range(len(game_tuples)),
                                                        game_tuples,
                                                        ball_df.itertuples(),
@@ -212,9 +216,9 @@ class ParsedReplay:
                 state.config = game_config
 
                 actions = {}
-                for j, uid, player_row in zip(range(len(car_rows)), player_dfs, car_rows):
+                for j, uid, player_row in zip(range(len(car_rows)), player_ids, car_rows):
                     car = state.cars[uid]
-                    if interpolate or not player_row.is_repeat and i % 30 == 0:
+                    if interpolate or not player_row.is_repeat and (not debug or i % 30 == 0):
                         if debug:
                             pred_pos = car.physics.position.copy()
                             pred_vel = car.physics.linear_velocity.copy()
@@ -233,6 +237,8 @@ class ParsedReplay:
                             diff_vel = np.linalg.norm(pred_vel - car.physics.linear_velocity)
                             diff_ang_vel = np.linalg.norm(pred_ang_vel - car.physics.angular_velocity)
                             diff_quat = np.linalg.norm(pred_quat - car.physics.quaternion)
+                            print(f"Diff pos: {diff_pos:.2f}, vel: {diff_vel:.2f}, ang_vel: {diff_ang_vel:.2f}, "
+                                  f"quat: {diff_quat:.2f} at frame {frame} for player {uid}")
 
                         if car.demo_respawn_timer == 0 and player_row.is_demoed:
                             car.demo_respawn_timer = 3
@@ -243,12 +249,26 @@ class ParsedReplay:
                     pitch = player_row.pitch
                     yaw = player_row.yaw
                     roll = player_row.roll
-                    if player_row.dodged:
-                        assert not car.on_ground and not car.is_jumping and not car.is_holding_jump and car.can_flip
+                    jump = 0
+                    if player_row.jumped:
+                        if not car.on_ground:
+                            asd = 1
+                        car.on_ground = True
+                        car.has_jumped = False
+                        jump = 1
+                    elif player_row.dodged:
+                        if car.on_ground or car.is_jumping or car.is_holding_jump or not car.can_flip:
+                            asd = 1
+                        car.has_flipped = False
+                        car.is_flipping = False
+                        car.on_ground = False
+                        car.is_jumping = False
+                        car.is_holding_jump = False
+                        car.has_double_jumped = False
                         # TODO find out why it's not dodging in RLViser
-                        pitch = -player_row.dodge_torque_x
+                        pitch = -player_row.dodge_torque_y
                         yaw = 0
-                        roll = -player_row.dodge_torque_y
+                        roll = -player_row.dodge_torque_x
                         mx = max(abs(pitch), abs(roll))
                         if mx > 0:
                             pitch /= mx
@@ -258,10 +278,23 @@ class ParsedReplay:
                             pitch = 0
                             roll = 1
                             yaw = -1
+                        jump = 1
+                        if debug:
+                            dodge_torque = np.array([player_row.dodge_torque_x, player_row.dodge_torque_y, 0])
+                            dodge_torque = dodge_torque / np.linalg.norm(dodge_torque)
+                            print(f"Player {uid} dodged at frame {frame} ({dodge_torque})")
                     elif player_row.dodge_is_active:
                         # TODO handle flip cancels
                         pitch = yaw = roll = 0
-                    if player_row.double_jumped:
+                        if debug:
+                            print(f"Player {uid} should be dodging at frame {frame} ({car.flip_torque}) "
+                                  f"{car.is_flipping=}")
+                    elif player_row.double_jumped:
+                        car.on_ground = False
+                        car.is_jumping = False
+                        car.is_holding_jump = False
+                        car.has_flipped = False
+                        car.has_double_jumped = False
                         mx = max(abs(pitch), abs(yaw), abs(roll))
                         if mx >= game_config.dodge_deadzone:
                             # Would not have been a double jump, but a dodge. Correct it
@@ -269,11 +302,8 @@ class ParsedReplay:
                             pitch = pitch * limiter
                             roll = roll * limiter
                             yaw = yaw * limiter
+                        jump = 1
 
-                    jump = (player_row.jump_is_active
-                            or player_row.double_jump_is_active
-                            or player_row.dodge_is_active
-                            or player_row.flip_car_is_active)
                     boost = player_row.boost_is_active
                     handbrake = player_row.handbrake
                     action = np.array([throttle, steer, pitch, yaw, roll, jump, boost, handbrake],
@@ -290,17 +320,3 @@ class ParsedReplay:
                     actions[uid] = action.reshape(1, -1).repeat(ticks, axis=0)
                 transition_engine.set_state(state, {})
                 state = transition_engine.step(actions, {})
-
-
-if __name__ == '__main__':
-    from rlgym.rocket_league.rlviser.rlviser_renderer import RLViserRenderer
-    from tqdm import tqdm
-
-    replay = ParsedReplay.load("test_replays/00029e4d-242d-49ed-971d-1218daa2eefa.replay")
-    renderer = RLViserRenderer(tick_rate=30)
-    for state, actions in tqdm(replay.to_rlgym(debug=True)):
-        # print(state)
-        time.sleep(state.tick_count / TICKS_PER_SECOND)
-        renderer.render(state, {})
-        asd = 1
-    renderer.close()

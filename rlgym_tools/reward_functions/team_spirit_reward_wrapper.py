@@ -1,9 +1,7 @@
 from typing import Any, Dict, List
+
 from rlgym.api import RewardFunction, AgentID
 from rlgym.rocket_league.api import GameState
-from rlgym.rocket_league.common_values import CEILING_Z, BALL_RADIUS, BLUE_TEAM
-
-import numpy as np
 
 
 class TeamSpiritRewardWrapper(RewardFunction[AgentID, GameState, float]):
@@ -19,7 +17,7 @@ class TeamSpiritRewardWrapper(RewardFunction[AgentID, GameState, float]):
         base_rewards = self.reward_fn.get_rewards(agents, state, is_terminated, is_truncated, shared_info)
         total_blue = total_orange = n_blue = n_orange = 0
         for agent in agents:
-            if state.cars[agent].team_num == BLUE_TEAM:
+            if state.cars[agent].is_blue:
                 total_blue += base_rewards[agent]
                 n_blue += 1
             else:
@@ -32,7 +30,7 @@ class TeamSpiritRewardWrapper(RewardFunction[AgentID, GameState, float]):
         spirit_rewards = {}
         for agent in agents:
             rew = base_rewards[agent]
-            if state.cars[agent].team_num == BLUE_TEAM:
+            if state.cars[agent].is_blue:
                 team_mean, opp_mean = mean_blue, mean_orange
             else:
                 team_mean, opp_mean = mean_orange, mean_blue
