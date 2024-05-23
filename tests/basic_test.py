@@ -17,6 +17,7 @@ from rlgym_tools.reward_functions.aerial_distance_reward import AerialDistanceRe
 from rlgym_tools.reward_functions.demo_reward import DemoReward
 from rlgym_tools.reward_functions.flip_reset_reward import FlipResetReward
 from rlgym_tools.reward_functions.goal_prob_reward import GoalViewReward
+from rlgym_tools.reward_functions.stack_reward import StackReward
 from rlgym_tools.reward_functions.team_spirit_reward_wrapper import TeamSpiritRewardWrapper
 from rlgym_tools.reward_functions.velocity_player_to_ball_reward import VelocityPlayerToBallReward
 from rlgym_tools.shared_info_providers.scoreboard_provider import ScoreboardProvider
@@ -32,6 +33,15 @@ def main():
     tick_skip = 12
     gamma = half_life_to_gamma(half_life_seconds=10, tick_skip=tick_skip)
 
+    rewards = [GoalReward(),
+                 AerialDistanceReward(touch_height_weight=1 / 2044,
+                                      car_distance_weight=1 / 5120,
+                                      ball_distance_weight=1 / 5120),
+                 DemoReward(),
+                 FlipResetReward(),
+                 GoalViewReward(),
+                 VelocityPlayerToBallReward()]
+    reward_weights = [20, 1, 5, 10, 10, tick_skip / TICKS_PER_SECOND]
     env = RLGym(
         state_mutator=MutatorSequence(
             ConfigMutator(boost_consumption=0.1),
@@ -49,17 +59,7 @@ def main():
                 repeats=tick_skip),
             action_queue_size=3
         ),
-        reward_fn=TeamSpiritRewardWrapper(
-            CombinedReward(
-                (GoalReward(), 20.),
-                (AerialDistanceReward(touch_height_weight=1 / 2044,
-                                      car_distance_weight=1 / 5120,
-                                      ball_distance_weight=1 / 5120), 1.),
-                (DemoReward(), 5.),
-                (FlipResetReward(), 10.),
-                (GoalViewReward(), 10.),
-                (VelocityPlayerToBallReward(), tick_skip / TICKS_PER_SECOND)
-            ), team_spirit=0.5),
+        reward_fn=TeamSpiritRewardWrapper(StackReward(rewards), team_spirit=0.5),
         transition_engine=RocketSimEngine(),
         termination_cond=GameCondition(seconds_per_goal_forfeit=10, max_overtime_seconds=300),
         truncation_cond=None,
@@ -80,7 +80,8 @@ def main():
             obs, rewards, is_terminated, is_truncated = env.step(actions)
             n += 1
 
-            assert np.isclose(sum(rewards.values()), 0), "Team spirit reward failed"
+            # assert np.isclose(sum(rewards.values()), 0), "Team spirit reward failed"
+            assert np.isclose(sum(rewards.values()), 0).all(), "Team spirit reward failed"
 
             done = any(is_terminated.values()) or any(is_truncated.values())
         t1 = time.perf_counter()
