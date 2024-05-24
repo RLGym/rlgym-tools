@@ -30,7 +30,10 @@ class GoalProbReward(RewardFunction[AgentID, GameState, float]):
         # Probability goes from 0-1, but for a reward we want it to go from -1 to 1
         # 2x-1 - (2y-1) = 2(x-y)
         reward = 2 * (prob - self.prob)
-        rewards = {agent: reward for agent in agents}
+        rewards = {
+            agent: reward if state.cars[agent].is_blue else -reward
+            for agent in agents
+        }
         return rewards
 
 
