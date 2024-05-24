@@ -47,8 +47,6 @@ class GoalProbReward(RewardFunction[AgentID, GameState, float]):
 class GoalViewReward(GoalProbReward):
     def calculate_blue_goal_prob(self, state: GameState):
         ball_pos = state.ball.position
-        view_blue = view_goal_ratio(ball_pos, -GOAL_THRESHOLD)
-        view_orange = view_goal_ratio(ball_pos, GOAL_THRESHOLD)
-        odds_blue = view_blue / (1 - view_blue)
-        odds_orange = view_orange / (1 - view_orange)
-        return 1 / (1 + odds_blue / odds_orange)
+        view_blue = view_goal_ratio(ball_pos, -GOAL_THRESHOLD)  # Blue net aka orange scoring
+        view_orange = view_goal_ratio(ball_pos, GOAL_THRESHOLD)  # Orange net aka blue scoring
+        return view_orange / (view_blue + view_orange)
