@@ -1,1 +1,1 @@
-from game_condition import GameCondition
+from .game_condition import GameCondition
