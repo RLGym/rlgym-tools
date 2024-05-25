@@ -1,0 +1,1 @@
+from .scoreboard_provider import ScoreboardProvider
