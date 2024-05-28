@@ -94,7 +94,7 @@ class ScoreboardProvider(SharedInfoProvider[AgentID, GameState]):
                 info.orange_score += 1
             info.go_to_kickoff = True
 
-        if info.kickoff_timer_seconds > 0 and state.ball.position[2] == 0:
+        if info.kickoff_timer_seconds > 0 and state.ball.position[1] == 0:
             info.kickoff_timer_seconds -= ticks_passed / TICKS_PER_SECOND
             if info.kickoff_timer_seconds <= 0:
                 info.kickoff_timer_seconds = 0

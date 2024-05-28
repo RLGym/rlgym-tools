@@ -1,7 +1,7 @@
 from typing import List, Dict, Any
 
 import numpy as np
-from rlgym.api import RewardFunction, AgentID, StateType, RewardType
+from rlgym.api import RewardFunction, AgentID, StateType
 from rlgym.rocket_league.api import GameState
 
 
