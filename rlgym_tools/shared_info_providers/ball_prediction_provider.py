@@ -1,10 +1,9 @@
 from typing import List, Dict, Any
 
+import RocketSim as rs
 import numpy as np
 from rlgym.api import SharedInfoProvider, AgentID
 from rlgym.rocket_league.api import GameState, PhysicsObject
-
-import RocketSim as rs
 from rlgym.rocket_league.common_values import TICKS_PER_SECOND
 
 

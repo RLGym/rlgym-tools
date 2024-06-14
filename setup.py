@@ -10,7 +10,7 @@ setup(
     name='rlgym_tools',
     packages=find_packages(),
     version=__version__,
-    description='Extra tools for RLGym, like SB3 compatibility',
+    description='Extra tools for RLGym.',
     long_description=long_description,
     long_description_content_type='text/markdown',
     author='Rolv-Arild Braaten, Lucas Emery and Matthew Allen',
