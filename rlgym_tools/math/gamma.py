@@ -1,3 +1,5 @@
+import math
+
 from rlgym.rocket_league.common_values import TICKS_PER_SECOND
 
 
@@ -10,7 +12,7 @@ def half_life_to_gamma(half_life_seconds: float, tick_skip: int) -> float:
 
 
 def gamma_to_half_life(gamma: float, tick_skip: int) -> float:
-    half_life_steps = 1 / (1 - gamma)
+    half_life_steps = -math.log(2) / math.log(gamma)
     half_life_ticks = half_life_steps * tick_skip
     half_life_seconds = half_life_ticks / TICKS_PER_SECOND
     return half_life_seconds
