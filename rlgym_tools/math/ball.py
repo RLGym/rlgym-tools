@@ -27,6 +27,8 @@ def solve_parabolic_trajectory(ball: PhysicsObject, g=GRAVITY):
 
 def ball_hit_ground(ticks_passed: int, ball: PhysicsObject, pre=False):
     t_neg, t_pos = solve_parabolic_trajectory(ball)
+    if t_neg is None or t_pos is None:
+        return ball.position[2] <= BALL_RESTING_HEIGHT
     if pre:
         # Positive solution, e.g. looking in the future
         # Less accurate since ball can hit something else before the ground.

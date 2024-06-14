@@ -28,7 +28,7 @@ class ActionHistoryWrapper(ActionParser[AgentID, np.ndarray, np.ndarray, GameSta
             if len(history) < self.ticks_to_remember:
                 self.action_history[agent] = np.vstack((history, action))
             elif len(action) >= self.ticks_to_remember:
-                history[:] = action[-self.ticks_to_remember:]
+                self.action_history[agent] = action[-self.ticks_to_remember:]
             else:
                 history[:-len(action)] = history[len(action):]
                 history[-len(action):] = action

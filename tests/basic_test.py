@@ -9,6 +9,7 @@ from rlgym.rocket_league.rlviser import RLViserRenderer
 from rlgym.rocket_league.sim import RocketSimEngine
 from rlgym.rocket_league.state_mutators import MutatorSequence
 
+from rlgym_tools.action_parsers.action_history_wrapper import ActionHistoryWrapper
 from rlgym_tools.action_parsers.advanced_lookup_table_action import AdvancedLookupTableAction
 from rlgym_tools.action_parsers.delayed_action import DelayedAction
 from rlgym_tools.done_conditions.game_condition import GameCondition
@@ -21,6 +22,8 @@ from rlgym_tools.reward_functions.goal_prob_reward import GoalViewReward
 from rlgym_tools.reward_functions.stack_reward import StackReward
 from rlgym_tools.reward_functions.team_spirit_reward_wrapper import TeamSpiritRewardWrapper
 from rlgym_tools.reward_functions.velocity_player_to_ball_reward import VelocityPlayerToBallReward
+from rlgym_tools.shared_info_providers.ball_prediction_provider import BallPredictionProvider
+from rlgym_tools.shared_info_providers.multi_provider import MultiProvider
 from rlgym_tools.shared_info_providers.scoreboard_provider import ScoreboardProvider
 from rlgym_tools.state_mutators.augment_mutator import AugmentMutator
 from rlgym_tools.state_mutators.config_mutator import ConfigMutator
@@ -53,17 +56,22 @@ def main():
             AugmentMutator()
         ),
         obs_builder=RelativeDefaultObs(),
-        action_parser=DelayedAction(
-            RepeatAction(
-                AdvancedLookupTableAction(),
-                repeats=tick_skip),
-            action_queue_size=3
+        action_parser=ActionHistoryWrapper(
+            DelayedAction(
+                RepeatAction(
+                    AdvancedLookupTableAction(),
+                    repeats=tick_skip),
+                action_queue_size=3
+            )
         ),
         reward_fn=TeamSpiritRewardWrapper(StackReward(rewards), team_spirit=0.5),
         transition_engine=RocketSimEngine(),
         termination_cond=GameCondition(seconds_per_goal_forfeit=10, max_overtime_seconds=300),
         truncation_cond=None,
-        shared_info_provider=ScoreboardProvider(),
+        shared_info_provider=MultiProvider(
+            ScoreboardProvider(),
+            BallPredictionProvider(5, 0.5),
+        ),
         renderer=RLViserRenderer(tick_rate=TICKS_PER_SECOND / tick_skip),
     )
 
