@@ -8,6 +8,7 @@ from rlgym.rocket_league.common_values import ORANGE_TEAM, OCTANE, BLUE_TEAM, TI
 from rlgym.rocket_league.sim import RocketSimEngine
 from rlgym.rocket_league.state_mutators import FixedTeamSizeMutator, KickoffMutator
 
+from rlgym_tools.math.ball import ball_hit_ground
 from rlgym_tools.shared_info_providers.scoreboard_provider import ScoreboardProvider, ScoreboardInfo
 from rlgym.rocket_league.math import quat_to_rot_mtx
 from rlgym_tools.math.inverse_aerial_controls import aerial_inputs
@@ -53,7 +54,7 @@ def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"
     shared_info = {}
     shared_info = scoreboard_provider.create(shared_info)
     scoreboard: ScoreboardInfo = shared_info["scoreboard"]
-    scoreboard.game_timer_seconds = replay.game_df["replicated_seconds_remaining"].iloc[[0]].fillna(300.).values[0]
+    scoreboard.game_timer_seconds = replay.game_df["seconds_remaining"].iloc[[0]].fillna(300.).values[0]
     scoreboard.kickoff_timer_seconds = 5.
     scoreboard.blue_score = 0
     scoreboard.orange_score = 0
@@ -62,7 +63,8 @@ def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"
 
     player_ids = sorted(replay.player_dfs.keys())
 
-    for g, gameplay_period in enumerate(replay.analyzer["gameplay_periods"]):
+    gameplay_periods = replay.analyzer["gameplay_periods"]
+    for g, gameplay_period in enumerate(gameplay_periods):
         start_frame = gameplay_period["start_frame"]
         goal_frame = gameplay_period.get("goal_frame")
         end_frame = goal_frame or gameplay_period["end_frame"]
@@ -127,10 +129,19 @@ def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"
                 actions[uid] = action
                 is_latest[uid] = not player_row.is_repeat
 
+            # Update the scoreboard
             if i == 0 and g == 0:
                 scoreboard_provider.set_state(player_ids, state, shared_info)
             scoreboard_provider.step(player_ids, state, shared_info)
             scoreboard = deepcopy(shared_info["scoreboard"])
+            if i == len(game_tuples) - 1 and scoreboard.game_timer_seconds == 0:
+                ticks = replay.game_df["delta"].mean() * TICKS_PER_SECOND
+                hit = ball_hit_ground(ticks, state.ball, pre=True)
+                if hit and g == len(gameplay_periods) - 1 and not scoreboard.is_over:
+                    scoreboard.is_over = True
+                elif hit and not scoreboard.go_to_kickoff:
+                    scoreboard.go_to_kickoff = True
+
             episode_seconds_remaining = game_row.episode_seconds_remaining
 
             res = ReplayFrame(

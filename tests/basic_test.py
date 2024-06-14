@@ -4,10 +4,10 @@ import numpy as np
 from rlgym.api import RLGym
 from rlgym.rocket_league.action_parsers import RepeatAction
 from rlgym.rocket_league.common_values import TICKS_PER_SECOND
-from rlgym.rocket_league.reward_functions import CombinedReward, GoalReward
+from rlgym.rocket_league.reward_functions import GoalReward
 from rlgym.rocket_league.rlviser import RLViserRenderer
 from rlgym.rocket_league.sim import RocketSimEngine
-from rlgym.rocket_league.state_mutators import MutatorSequence, KickoffMutator
+from rlgym.rocket_league.state_mutators import MutatorSequence
 
 from rlgym_tools.action_parsers.advanced_lookup_table_action import AdvancedLookupTableAction
 from rlgym_tools.action_parsers.delayed_action import DelayedAction
@@ -25,7 +25,6 @@ from rlgym_tools.shared_info_providers.scoreboard_provider import ScoreboardProv
 from rlgym_tools.state_mutators.augment_mutator import AugmentMutator
 from rlgym_tools.state_mutators.config_mutator import ConfigMutator
 from rlgym_tools.state_mutators.game_mutator import GameMutator
-from rlgym_tools.state_mutators.replay_mutator import ReplayMutator
 from rlgym_tools.state_mutators.variable_team_size_mutator import VariableTeamSizeMutator
 from rlgym_tools.state_mutators.weighted_sample_mutator import WeightedSampleMutator
 

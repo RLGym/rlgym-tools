@@ -25,7 +25,7 @@ class ScoreboardInfo:
 
     @property
     def is_overtime(self):
-        return math.isinf(self.game_timer_seconds) and self.blue_score == self.orange_score
+        return math.isinf(self.game_timer_seconds)
 
     @property
     def is_kickoff(self):
@@ -85,13 +85,15 @@ class ScoreboardProvider(SharedInfoProvider[AgentID, GameState]):
         self.last_ticks = state.tick_count
 
         # Copy info into new object to avoid modifying in place
-        info = replace(self.info)
+        info: ScoreboardInfo = replace(self.info)
 
         if state.goal_scored:
             if state.scoring_team == BLUE_TEAM:
                 info.blue_score += 1
             else:
                 info.orange_score += 1
+            if info.is_overtime:
+                info.is_over = True
             info.go_to_kickoff = True
 
         if info.kickoff_timer_seconds > 0 and state.ball.position[1] == 0:
@@ -102,7 +104,7 @@ class ScoreboardProvider(SharedInfoProvider[AgentID, GameState]):
             info.kickoff_timer_seconds = 0
             info.game_timer_seconds -= ticks_passed / TICKS_PER_SECOND
 
-        if info.game_timer_seconds <= 0:
+        if info.game_timer_seconds < 0:
             info.game_timer_seconds = 0
             if ball_hit_ground(ticks_passed, state.ball) or state.goal_scored:
                 if info.blue_score == info.orange_score:

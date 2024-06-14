@@ -9,24 +9,34 @@ BALL_RESTING_HEIGHT = 93.15
 GOAL_THRESHOLD = 5215.5  # Tested in-game with BakkesMod
 
 
-def ball_hit_ground(ticks_passed: int, ball: PhysicsObject):
+def solve_parabolic_trajectory(ball: PhysicsObject, g=GRAVITY):
+    # Solve for the time of impact with the ground
     z = ball.position[2] - BALL_RESTING_HEIGHT
-    if z < 0:
-        return True
-
     vz = ball.linear_velocity[2]
-
-    # Reverse the trajectory to find the time of impact
-    g = GRAVITY
     a = -0.5 * g
     b = vz
     c = z
     discriminant = b ** 2 - 4 * a * c
     if discriminant < 0:
-        return False
-    t = (-b - discriminant ** 0.5) / (2 * a)  # Negative solution since we're looking for the past
-    if -ticks_passed / TICKS_PER_SECOND <= t <= 0:
-        return True
+        return None, None
+    discriminant = math.sqrt(discriminant)
+    t_neg = (-b + discriminant) / (2 * a)
+    t_pos = (-b - discriminant) / (2 * a)
+    return t_neg, t_pos
+
+
+def ball_hit_ground(ticks_passed: int, ball: PhysicsObject, pre=False):
+    t_neg, t_pos = solve_parabolic_trajectory(ball)
+    if pre:
+        # Positive solution, e.g. looking in the future
+        # Less accurate since ball can hit something else before the ground.
+        if 0 <= t_pos <= ticks_passed / TICKS_PER_SECOND:
+            return True
+    else:
+        # Negative solution, e.g. looking in the past.
+        # Generally preferred as it's more likely to be correct.
+        if -ticks_passed / TICKS_PER_SECOND <= t_neg <= 0:
+            return True
     return False
 
 
