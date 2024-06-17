@@ -1,18 +1,18 @@
 import warnings
 from copy import deepcopy
 from dataclasses import dataclass
+from typing import Literal, Dict, Optional
 
 import numpy as np
-from rlgym.rocket_league.api import GameState
-from rlgym.rocket_league.common_values import ORANGE_TEAM, OCTANE, BLUE_TEAM, TICKS_PER_SECOND
+from rlgym.rocket_league.api import GameState, Car
+from rlgym.rocket_league.common_values import ORANGE_TEAM, BLUE_TEAM, TICKS_PER_SECOND, DOUBLEJUMP_MAX_DELAY
+from rlgym.rocket_league.math import quat_to_rot_mtx
 from rlgym.rocket_league.sim import RocketSimEngine
 from rlgym.rocket_league.state_mutators import FixedTeamSizeMutator, KickoffMutator
 
 from rlgym_tools.math.ball import ball_hit_ground
-from rlgym_tools.shared_info_providers.scoreboard_provider import ScoreboardProvider, ScoreboardInfo
-from rlgym.rocket_league.math import quat_to_rot_mtx
 from rlgym_tools.math.inverse_aerial_controls import aerial_inputs
-from typing import Literal, Dict, Optional
+from rlgym_tools.shared_info_providers.scoreboard_provider import ScoreboardInfo
 
 try:
     import numba
@@ -32,13 +32,14 @@ except ImportError:
 class ReplayFrame:
     state: GameState
     actions: Dict[str, np.ndarray]
-    is_latest: Dict[str, bool]
+    update_age: Dict[str, float]
     scoreboard: ScoreboardInfo
     episode_seconds_remaining: float
     next_scoring_team: Optional[int]
 
 
-def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"] = "rocketsim", predict_pyr=True):
+def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"] = "rocketsim",
+                    predict_pyr=True, calculate_error=False):
     if interpolation not in ("none", "linear", "rocketsim"):
         raise ValueError(f"Interpolation mode {interpolation} not recognized")
     rocketsim_interpolation = interpolation == "rocketsim"
@@ -50,20 +51,36 @@ def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"
     base_mutator = FixedTeamSizeMutator(blue_size=len(players) - count_orange, orange_size=count_orange)
     kickoff_mutator = KickoffMutator()
 
-    scoreboard_provider = ScoreboardProvider()
+    average_tick_rate = replay.game_df["delta"].mean() * TICKS_PER_SECOND
+
+    player_ids = sorted(int(k) for k in replay.player_dfs.keys())
+
+    total_pos_error = {}
+    total_quat_error = {}
+    total_vel_error = {}
+    total_ang_vel_error = {}
+
+    # Track scoreline
+    blue = orange = 0
     shared_info = {}
-    shared_info = scoreboard_provider.create(shared_info)
-    scoreboard: ScoreboardInfo = shared_info["scoreboard"]
-    scoreboard.game_timer_seconds = replay.game_df["seconds_remaining"].iloc[[0]].fillna(300.).values[0]
-    scoreboard.kickoff_timer_seconds = 5.
-    scoreboard.blue_score = 0
-    scoreboard.orange_score = 0
-    scoreboard.go_to_kickoff = False
-    scoreboard.is_over = False
-
-    player_ids = sorted(replay.player_dfs.keys())
-
     gameplay_periods = replay.analyzer["gameplay_periods"]
+
+    # For some reason transitioning from regulation to overtime is not always detected properly
+    last_period = gameplay_periods[-1]
+    start_frame = last_period["start_frame"]
+    end_frame = last_period["end_frame"]
+    overtime = replay.game_df.loc[start_frame:end_frame]["is_overtime"] == 1
+    if overtime.nunique() > 1:
+        gameplay_periods = gameplay_periods[:-1]
+        switch = overtime.diff().idxmax()
+        first_hits = (replay.game_df.loc[start_frame:end_frame]["ball_has_been_hit"] == 1).diff() > 0
+        first_hits = first_hits[first_hits].index
+        goal_frame = end_frame if abs(replay.ball_df.loc[end_frame, "pos_y"]) > 5000 else None
+        gameplay_periods.extend([
+            {"start_frame": start_frame, "first_hit_frame": first_hits[0], "goal_frame": None, "end_frame": switch - 1},
+            {"start_frame": switch, "first_hit_frame": first_hits[-1], "goal_frame": goal_frame, "end_frame": end_frame},
+        ])
+
     for g, gameplay_period in enumerate(gameplay_periods):
         start_frame = gameplay_period["start_frame"]
         goal_frame = gameplay_period.get("goal_frame")
@@ -79,7 +96,7 @@ def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"
             player = players[uid]
             # car.hitbox_type = OCTANE  # TODO: Get hitbox from replay
             car.team_num = ORANGE_TEAM if player["is_orange"] else BLUE_TEAM
-            new_cars[uid] = car
+            new_cars[int(uid)] = car
         state.cars = new_cars
 
         kickoff_mutator.apply(state, shared_info)
@@ -122,32 +139,51 @@ def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"
             state.goal_scored = frame == goal_frame
 
             actions = {}
-            is_latest = {}
+            update_age = {}
             for uid, player_row in zip(player_ids, car_rows):
                 car = state.cars[uid]
-                action = _update_car_and_get_action(car, linear_interpolation, player_row, state)
-                actions[uid] = action
-                is_latest[uid] = not player_row.is_repeat
+                if calculate_error:
+                    action, error_pos, error_quat, error_vel, error_ang_vel \
+                        = _update_car_and_get_action(car, linear_interpolation, player_row, state,
+                                                     calculate_error=True)
 
-            # Update the scoreboard
-            if i == 0 and g == 0:
-                scoreboard_provider.set_state(player_ids, state, shared_info)
-            scoreboard_provider.step(player_ids, state, shared_info)
-            scoreboard = deepcopy(shared_info["scoreboard"])
-            if i == len(game_tuples) - 1 and scoreboard.game_timer_seconds == 0:
-                ticks = replay.game_df["delta"].mean() * TICKS_PER_SECOND
-                hit = ball_hit_ground(ticks, state.ball, pre=True)
-                if hit and g == len(gameplay_periods) - 1 and not scoreboard.is_over:
-                    scoreboard.is_over = True
-                elif hit and not scoreboard.go_to_kickoff:
-                    scoreboard.go_to_kickoff = True
+                    if frame != start_frame and not np.isnan(error_pos):
+                        total_pos_error.setdefault(uid, []).append(error_pos)
+                        total_quat_error.setdefault(uid, []).append(error_quat)
+                        total_vel_error.setdefault(uid, []).append(error_vel)
+                        total_ang_vel_error.setdefault(uid, []).append(error_ang_vel)
+                else:
+                    action = _update_car_and_get_action(car, linear_interpolation, player_row, state)
+
+                actions[uid] = action
+                update_age[uid] = player_row.update_age
+
+            if state.goal_scored:
+                if state.scoring_team == BLUE_TEAM:
+                    blue += 1
+                elif state.scoring_team == ORANGE_TEAM:
+                    orange += 1
+            scoreboard = ScoreboardInfo(
+                game_timer_seconds=game_row.scoreboard_timer,
+                kickoff_timer_seconds=game_row.kickoff_timer,
+                blue_score=blue,
+                orange_score=orange,
+                go_to_kickoff=frame == end_frame and g < len(gameplay_periods) - 1,
+                is_over=(frame == end_frame
+                         and g == len(gameplay_periods) - 1
+                         and blue != orange
+                         and not (1 < game_row.scoreboard_timer <= 300)
+                         and (state.goal_scored
+                              or ball_hit_ground(2 * average_tick_rate, state.ball, pre=True)
+                              or ball_hit_ground(game_row.delta * TICKS_PER_SECOND, state.ball, pre=False))),
+            )
 
             episode_seconds_remaining = game_row.episode_seconds_remaining
 
             res = ReplayFrame(
                 state=state,
                 actions=actions,
-                is_latest=is_latest,
+                update_age=update_age,
                 scoreboard=scoreboard,
                 episode_seconds_remaining=episode_seconds_remaining,
                 next_scoring_team=next_scoring_team,
@@ -166,6 +202,27 @@ def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"
                 state = transition_engine.step(actions, {})
             else:
                 state = deepcopy(state)
+    if calculate_error:
+        import matplotlib.pyplot as plt
+        fig, axs = plt.subplots(nrows=4)
+        i = 0
+        for name, error in [("Position", total_pos_error), ("Quaternion", total_quat_error),
+                            ("Velocity", total_vel_error), ("Angular velocity", total_ang_vel_error)]:
+            for uid, errors in error.items():
+                error[uid] = np.array(errors)
+                axs[i].plot(error[uid], label=uid)
+            all_errors = np.concatenate(list(error.values()))
+            print(f"{name} error: \n"
+                  f"\tMean: {np.mean(all_errors)}\n"
+                  f"\tStd: {np.std(all_errors)}\n"
+                  f"\tMedian: {np.median(all_errors)}\n"
+                  f"\tMax: {np.max(all_errors)}")
+            # axs[i].hist(all_errors, bins=100)
+            # axs[i].set_yscale("log")
+            axs[i].set_title(name)
+            i += 1
+        fig.legend()
+        plt.show()
 
 
 def _prepare_segment_dfs(replay, start_frame, end_frame, linear_interpolation, predict_pyr):
@@ -181,9 +238,16 @@ def _prepare_segment_dfs(replay, start_frame, end_frame, linear_interpolation, p
         pdf = pdf.ffill().fillna(0.)
         pdf["is_repeat"] = is_repeat.astype(float)
         pdf["is_demoed"] = is_demoed.astype(float)
+        pdf["got_demoed"] = pdf["is_demoed"].diff() > 0
+        pdf["respawned"] = pdf["is_demoed"].diff() < 0
         pdf["jumped"] = pdf["jump_is_active"].fillna(0.).diff() > 0
         pdf["dodged"] = pdf["dodge_is_active"].fillna(0.).diff() > 0
         pdf["double_jumped"] = pdf["double_jump_is_active"].fillna(0.).diff() > 0
+
+        times = game_df["time"].copy()
+        times[is_repeat] = np.nan
+        times = times.ffill().fillna(0.)
+        pdf["update_age"] = game_df["time"] - times
 
         pyr_cols = ["pitch", "yaw", "roll"]
         pdf[pyr_cols] = np.nan
@@ -196,43 +260,97 @@ def _prepare_segment_dfs(replay, start_frame, end_frame, linear_interpolation, p
             # Set interpolate cols to NaN if they are repeated
             pdf.loc[is_repeat, physics_cols] = np.nan
             pdf = pdf.interpolate()  # Note that this assumes equal time steps
-        player_dfs[uid] = pdf
+        player_dfs[int(uid)] = pdf
     game_df["episode_seconds_remaining"] = game_df["time"].iloc[-1] - game_df["time"]
+
+    # `seconds_remaining` seems to be the ceil of the true game timer
+    # We recreate the true timer here
+    scoreboard_timer = game_df["seconds_remaining"].copy()
+    ball_hit = game_df["ball_has_been_hit"] == 1  # Where the timer is running
+
+    # Synchronize by finding first change in the timer
+    decreases = scoreboard_timer[ball_hit].diff() < 0
+    if decreases.any():
+        first_change = decreases.idxmax()
+    else:
+        first_change = decreases.index[0]
+    delta = game_df["time"][ball_hit] - game_df["time"][ball_hit].loc[first_change]
+    scoreboard_timer[ball_hit] = scoreboard_timer.loc[first_change] - delta
+    scoreboard_timer[~ball_hit] = np.nan
+    scoreboard_timer = scoreboard_timer.ffill().bfill()
+
+    # Handle overtime and negative values
+    if "is_overtime" in game_df:
+        scoreboard_timer[game_df["is_overtime"] == 1] = np.inf
+    scoreboard_timer[scoreboard_timer < 0] = 0
+
+    game_df["scoreboard_timer"] = scoreboard_timer
+
+    # Now kickoff timer
+    game_df["kickoff_timer"] = 0.0
+    delta = game_df["time"][~ball_hit] - game_df["time"][~ball_hit].iloc[0]
+    game_df.loc[~ball_hit, "kickoff_timer"] = (5.0 - delta).clip(0, 5)
+
     return ball_df, game_df, player_dfs
 
 
-def _update_car_and_get_action(car, linear_interpolation, player_row, state):
+def _update_car_and_get_action(car: Car, linear_interpolation: bool, player_row, state: GameState,
+                               calculate_error=False):
+    error_pos = error_quat = error_vel = error_ang_vel = np.nan
     if linear_interpolation or not player_row.is_repeat:
         true_pos = (player_row.pos_x, player_row.pos_y, player_row.pos_z)
         true_vel = (player_row.vel_x, player_row.vel_y, player_row.vel_z)
         true_ang_vel = (player_row.ang_vel_x, player_row.ang_vel_y, player_row.ang_vel_z)
         true_quat = (player_row.quat_w, player_row.quat_x, player_row.quat_y, player_row.quat_z)
 
+        if player_row.got_demoed and not car.is_demoed:
+            car.demo_respawn_timer = 3
+        elif player_row.is_demoed and not car.is_demoed:
+            car.demo_respawn_timer = 1 / TICKS_PER_SECOND
+        elif not player_row.is_demoed and car.is_demoed:
+            car.demo_respawn_timer = 0
+
+        if calculate_error and not player_row.respawned:
+            error_pos = np.linalg.norm(car.physics.position - np.array(true_pos))
+            error_quat = min(np.linalg.norm(car.physics.quaternion - np.array(true_quat)),
+                             np.linalg.norm(car.physics.quaternion + np.array(true_quat)))
+            error_vel = np.linalg.norm(car.physics.linear_velocity - np.array(true_vel))
+            error_ang_vel = np.linalg.norm(car.physics.angular_velocity - np.array(true_ang_vel))
+
         car.physics.position[:] = true_pos
         car.physics.linear_velocity[:] = true_vel
         car.physics.angular_velocity[:] = true_ang_vel
         car.physics.quaternion = np.array(true_quat)  # Uses property setter
 
-        if car.demo_respawn_timer == 0 and player_row.is_demoed:
-            car.demo_respawn_timer = 3
     car.boost_amount = player_row.boost_amount / 100
     throttle = 2 * player_row.throttle / 255 - 1
     steer = 2 * player_row.steer / 255 - 1
+    if abs(throttle) < 0.01:
+        throttle = 0
+    if abs(steer) < 0.01:
+        steer = 0
     pitch = player_row.pitch
     yaw = player_row.yaw
     roll = player_row.roll
     jump = 0
-    if player_row.jumped:
-        car.on_ground = True
-        car.has_jumped = False
-        jump = 1
-    elif player_row.dodged:
+
+    if player_row.dodged or player_row.double_jumped:
+        # Make sure the car is in a valid state for dodging/double jumping
         car.has_flipped = False
         car.is_flipping = False
         car.on_ground = False
         car.is_jumping = False
         car.is_holding_jump = False
         car.has_double_jumped = False
+        if car.air_time_since_jump >= DOUBLEJUMP_MAX_DELAY:
+            car.air_time_since_jump = DOUBLEJUMP_MAX_DELAY - 1 / TICKS_PER_SECOND
+        assert car.can_flip
+
+    if player_row.jumped:
+        car.on_ground = True
+        car.has_jumped = False
+        jump = 1
+    elif player_row.dodged:
         new_pitch = -player_row.dodge_torque_y
         new_roll = -player_row.dodge_torque_x
         mx = max(abs(new_pitch), abs(new_roll))
@@ -248,18 +366,18 @@ def _update_car_and_get_action(car, linear_interpolation, player_row, state):
             pitch = 0
         jump = 1
     elif player_row.dodge_is_active:
+        actual_torque = np.array([player_row.dodge_torque_x, player_row.dodge_torque_y, 0])
+        actual_torque = actual_torque / (np.linalg.norm(actual_torque) or 1)
+
         car.on_ground = False
         car.is_flipping = True
-        car.flip_torque = np.array([player_row.dodge_torque_x, player_row.dodge_torque_y, 0])
+        car.flip_torque = actual_torque
         car.has_flipped = True
-        # TODO handle flip cancels
-        pitch = yaw = roll = 0
+
+        # Pitch/yaw/roll is handled by inverse aerial control function already,
+        # it knows about the flip and detects the cancel automatically
+        # pitch = yaw = roll = 0
     elif player_row.double_jumped:
-        car.on_ground = False
-        car.is_jumping = False
-        car.is_holding_jump = False
-        car.has_flipped = False
-        car.has_double_jumped = False
         mag = abs(pitch) + abs(yaw) + abs(roll)
         if mag >= state.config.dodge_deadzone:
             # Would not have been a double jump, but a dodge. Correct it
@@ -276,6 +394,8 @@ def _update_car_and_get_action(car, linear_interpolation, player_row, state):
     handbrake = player_row.handbrake
     action = np.array([throttle, steer, pitch, yaw, roll, jump, boost, handbrake],
                       dtype=np.float32)
+    if calculate_error:
+        return action, error_pos, error_quat, error_vel, error_ang_vel
     return action
 
 
@@ -284,12 +404,14 @@ _numba_aerial_inputs = optional_njit(aerial_inputs)
 
 
 @optional_njit
-def _multi_aerial_inputs(quats, ang_vels, times):
+def _multi_aerial_inputs(quats, ang_vels, times, is_flipping):
     pyrs = np.zeros((len(quats), 3), dtype=np.float32)
+    next_rot = _numba_quat_2_rot(quats[0])
     for i in range(len(quats) - 1):
-        rot = _numba_quat_2_rot(quats[i])
+        rot = next_rot
+        next_rot = _numba_quat_2_rot(quats[i + 1])
         dt = times[i + 1] - times[i]
-        pyrs[i, :] = _numba_aerial_inputs(ang_vels[i], ang_vels[i + 1], rot, dt)
+        pyrs[i, :] = _numba_aerial_inputs(ang_vels[i], ang_vels[i + 1], rot, next_rot, dt, is_flipping[i])
     return pyrs
 
 
@@ -298,11 +420,13 @@ def pyr_from_dataframe(game_df, player_df):
     times = game_df["time"].values.astype(np.float32)
     ang_vels = player_df[['ang_vel_x', 'ang_vel_y', 'ang_vel_z']].values.astype(np.float32)
     quats = player_df[['quat_w', 'quat_x', 'quat_y', 'quat_z']].values.astype(np.float32)
+    is_flipping = player_df["dodge_is_active"].values.astype(bool)
 
     quats = quats[~is_repeated]
     ang_vels = ang_vels[~is_repeated]
     times = times[~is_repeated]
+    is_flipping = is_flipping[~is_repeated]
 
-    pyrs = _multi_aerial_inputs(quats, ang_vels, times)
+    pyrs = _multi_aerial_inputs(quats, ang_vels, times, is_flipping)
 
     return pyrs

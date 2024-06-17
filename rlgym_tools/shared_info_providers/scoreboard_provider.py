@@ -87,6 +87,12 @@ class ScoreboardProvider(SharedInfoProvider[AgentID, GameState]):
         # Copy info into new object to avoid modifying in place
         info: ScoreboardInfo = replace(self.info)
 
+        if info.go_to_kickoff or info.is_over:
+            ticks_passed = 0
+
+        info.go_to_kickoff = False
+        info.is_over = False
+
         if state.goal_scored:
             if state.scoring_team == BLUE_TEAM:
                 info.blue_score += 1

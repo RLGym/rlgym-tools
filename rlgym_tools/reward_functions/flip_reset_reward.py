@@ -17,13 +17,12 @@ class FlipResetReward(RewardFunction[AgentID, GameState, float]):
         rewards = {k: 0 for k in agents}
         for agent in agents:
             car = state.cars[agent]
-            if car.ball_touches > 0:
-                if car.can_flip and not self.prev_state.cars[agent].can_flip:
-                    down = -car.physics.up
-                    car_ball = state.ball.position - car.physics.position
-                    car_ball = car_ball / np.linalg.norm(car_ball)
-                    cossim_down_ball = np.dot(down, car_ball)
-                    if cossim_down_ball > 0.5 ** 0.5:  # 45 degrees
-                        rewards[agent] = 1
+            if car.can_flip and not self.prev_state.cars[agent].can_flip:
+                down = -car.physics.up
+                car_ball = state.ball.position - car.physics.position
+                car_ball = car_ball / np.linalg.norm(car_ball)
+                cossim_down_ball = np.dot(down, car_ball)
+                if cossim_down_ball > 0.5 ** 0.5:  # 45 degrees
+                    rewards[agent] = 1
         self.prev_state = state
         return rewards
