@@ -31,11 +31,12 @@ except ImportError:
 @dataclass(slots=True)
 class ReplayFrame:
     state: GameState
-    actions: Dict[str, np.ndarray]
-    update_age: Dict[str, float]
+    actions: Dict[int, np.ndarray]
+    update_age: Dict[int, float]
     scoreboard: ScoreboardInfo
     episode_seconds_remaining: float
     next_scoring_team: Optional[int]
+    winning_team: Optional[int]
 
 
 def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"] = "rocketsim",
@@ -62,6 +63,13 @@ def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"
 
     # Track scoreline
     blue = orange = 0
+    final_goal_diff = sum(-1 if goal["is_orange"] else 1 for goal in replay.metadata["game"]["goals"])
+    winning_team = None
+    if final_goal_diff > 0:
+        winning_team = BLUE_TEAM
+    elif final_goal_diff < 0:
+        winning_team = ORANGE_TEAM
+
     shared_info = {}
     gameplay_periods = replay.analyzer["gameplay_periods"]
 
@@ -71,14 +79,26 @@ def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"
     end_frame = last_period["end_frame"]
     overtime = replay.game_df.loc[start_frame:end_frame]["is_overtime"] == 1
     if overtime.nunique() > 1:
+        # The last period is invalid, we need to split it up
         gameplay_periods = gameplay_periods[:-1]
-        switch = overtime.diff().idxmax()
+        end_first = overtime.diff().idxmax()
+        start_second = (replay.game_df["time"] > replay.game_df.loc[end_first, "time"] + 4).idxmax()
         first_hits = (replay.game_df.loc[start_frame:end_frame]["ball_has_been_hit"] == 1).diff() > 0
         first_hits = first_hits[first_hits].index
         goal_frame = end_frame if abs(replay.ball_df.loc[end_frame, "pos_y"]) > 5000 else None
         gameplay_periods.extend([
-            {"start_frame": start_frame, "first_hit_frame": first_hits[0], "goal_frame": None, "end_frame": switch - 1},
-            {"start_frame": switch, "first_hit_frame": first_hits[-1], "goal_frame": goal_frame, "end_frame": end_frame},
+            {
+                "start_frame": start_frame,
+                "first_hit_frame": first_hits[0],
+                "goal_frame": None,
+                "end_frame": end_first - 1
+            },
+            {
+                "start_frame": start_second,
+                "first_hit_frame": first_hits[-1],
+                "goal_frame": goal_frame,
+                "end_frame": end_frame
+            },
         ])
 
     for g, gameplay_period in enumerate(gameplay_periods):
@@ -121,6 +141,8 @@ def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"
             pdf = player_dfs[pid]
             player_rows.append(list(pdf.itertuples()))
 
+        assert ball_tuples[0].pos_x == ball_tuples[0].pos_y == 0
+
         # Iterate over the frames
         for i, game_row, ball_row, car_rows in zip(range(len(game_tuples)),
                                                    game_tuples,
@@ -156,7 +178,7 @@ def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"
                     action = _update_car_and_get_action(car, linear_interpolation, player_row, state)
 
                 actions[uid] = action
-                update_age[uid] = player_row.update_age
+                update_age[uid] = player_row.update_age if not player_row.is_demoed else 0
 
             if state.goal_scored:
                 if state.scoring_team == BLUE_TEAM:
@@ -187,6 +209,7 @@ def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"
                 scoreboard=scoreboard,
                 episode_seconds_remaining=episode_seconds_remaining,
                 next_scoring_team=next_scoring_team,
+                winning_team=winning_team,
             )
             yield res
 
@@ -234,6 +257,8 @@ def _prepare_segment_dfs(replay, start_frame, end_frame, linear_interpolation, p
         physics_cols = ([f"{col}_{axis}" for col in ("pos", "vel", "ang_vel") for axis in "xyz"] +
                         [f"quat_{axis}" for axis in "wxyz"])
         is_repeat = (pdf[physics_cols].diff() == 0).all(axis=1)
+        # If something repeats for 4 or more frames, assume it's not a real repeat, just the player standing still
+        is_repeat &= (is_repeat.rolling(4).sum() < 4)
         is_demoed = pdf["pos_x"].isna()
         pdf = pdf.ffill().fillna(0.)
         pdf["is_repeat"] = is_repeat.astype(float)
@@ -288,8 +313,12 @@ def _prepare_segment_dfs(replay, start_frame, end_frame, linear_interpolation, p
 
     # Now kickoff timer
     game_df["kickoff_timer"] = 0.0
-    delta = game_df["time"][~ball_hit] - game_df["time"][~ball_hit].iloc[0]
-    game_df.loc[~ball_hit, "kickoff_timer"] = (5.0 - delta).clip(0, 5)
+    try:
+        delta = game_df["time"][~ball_hit] - game_df["time"][~ball_hit].iloc[0]
+        kickoff_timer = (5.0 - delta).clip(0, 5)
+    except IndexError:
+        kickoff_timer = 0.0
+    game_df.loc[~ball_hit, "kickoff_timer"] = kickoff_timer
 
     return ball_df, game_df, player_dfs
 
@@ -430,3 +459,58 @@ def pyr_from_dataframe(game_df, player_df):
     pyrs = _multi_aerial_inputs(quats, ang_vels, times, is_flipping)
 
     return pyrs
+
+
+def get_valid_action_options(car: Car, replay_action: np.ndarray, action_options: np.ndarray, dodge_deadzone=0.5):
+    """
+    Get the valid action options for a car given a replay action and a set of action options.
+    :param car: The car to get the valid actions for
+    :param replay_action: The action from the replay
+    :param action_options: The action options to choose from
+    :param dodge_deadzone: The deadzone for dodges
+    :return: A tuple of mask and whether the actions in the mask are optimal
+             E.g. is this as good as we could've possibly done, or are there conflicts about what's best.
+             If the actions are not always optimal, it might be a sign that the action options
+             don't provide good enough coverage.
+    """
+    optimal = 0
+    masks = np.zeros(len(action_options), dtype=bool)
+    if replay_action[5] == 1:
+        # Jumping
+        masks += action_options[:, 5] == 1
+        optimal += 1
+        if not car.on_ground:
+            is_dodge = np.abs(replay_action[2:5]).sum() >= dodge_deadzone
+            is_dodges = np.abs(action_options[:, 2:5]).sum(axis=1) >= dodge_deadzone
+            if is_dodge:
+                # Make sure we're flipping in as close to the same direction as possible
+                dodge_dir = np.array([replay_action[2], replay_action[3] + replay_action[4]])
+                dir_error = ((action_options[:, 2] - dodge_dir[0]) ** 2
+                             + (action_options[:, 3:5].sum(axis=1) - dodge_dir[1]) ** 2)
+                masks += (dir_error == dir_error.min())
+                # And that we're exceeding deadzone
+                masks += is_dodges
+                optimal += 2
+            else:
+                # Make sure we're not exceeding deadzone
+                masks += ~is_dodges
+                optimal += 1
+    elif car.on_ground:
+        # Prioritize throttle, steer and handbrake
+        error = np.abs(action_options[:, :2] - replay_action[:2]).sum(axis=1)
+        masks += error == error.min()
+        masks += action_options[:, 7] == replay_action[7]
+        optimal += 2
+    else:
+        # Prioritize pitch, yaw and roll
+        error = np.abs(action_options[:, 2:5] - replay_action[2:5]).sum(axis=1)
+        masks += error == error.min()
+        optimal += 1
+
+    masks += action_options[:, 6] == replay_action[6]  # Boost
+    optimal += 1
+
+    mx = masks.max()
+    mask = masks == mx
+    is_optimal = mx == optimal
+    return mask, is_optimal
