@@ -475,40 +475,45 @@ def get_valid_action_options(car: Car, replay_action: np.ndarray, action_options
     """
     optimal = 0
     masks = np.zeros(len(action_options), dtype=bool)
-    if replay_action[5] == 1:
-        # Jumping
-        masks += action_options[:, 5] == 1
-        optimal += 1
-        if not car.on_ground:
-            is_dodge = np.abs(replay_action[2:5]).sum() >= dodge_deadzone
-            is_dodges = np.abs(action_options[:, 2:5]).sum(axis=1) >= dodge_deadzone
-            if is_dodge:
-                # Make sure we're flipping in as close to the same direction as possible
-                dodge_dir = np.array([replay_action[2], replay_action[3] + replay_action[4]])
-                dir_error = ((action_options[:, 2] - dodge_dir[0]) ** 2
-                             + (action_options[:, 3:5].sum(axis=1) - dodge_dir[1]) ** 2)
-                masks += (dir_error == dir_error.min())
-                # And that we're exceeding deadzone
-                masks += is_dodges
-                optimal += 2
-            else:
-                # Make sure we're not exceeding deadzone
-                masks += ~is_dodges
-                optimal += 1
-    elif car.on_ground:
-        # Prioritize throttle, steer and handbrake
-        error = np.abs(action_options[:, :2] - replay_action[:2]).sum(axis=1)
-        masks += error == error.min()
-        masks += action_options[:, 7] == replay_action[7]
-        optimal += 2
-    else:
-        # Prioritize pitch, yaw and roll
-        error = np.abs(action_options[:, 2:5] - replay_action[2:5]).sum(axis=1)
-        masks += error == error.min()
+
+    if car.on_ground or car.can_flip:
+        masks += action_options[:, 5] == replay_action[5]
         optimal += 1
 
-    masks += action_options[:, 6] == replay_action[6]  # Boost
+    if car.boost_amount > 0:
+        masks += action_options[:, 6] == replay_action[6]  # Boost
     optimal += 1
+
+    if replay_action[5] == 1 and not car.on_ground and car.can_flip:
+        # Double jump or dodge
+        is_dodge = np.abs(replay_action[2:5]).sum() >= dodge_deadzone
+        is_dodges = np.abs(action_options[:, 2:5]).sum(axis=1) >= dodge_deadzone
+        if is_dodge:
+            # Make sure we're flipping in as close to the same direction as possible
+            dodge_dir = np.array([replay_action[2], replay_action[3] + replay_action[4]])
+            dir_error = ((action_options[:, 2] - dodge_dir[0]) ** 2
+                         + (action_options[:, 3:5].sum(axis=1) - dodge_dir[1]) ** 2)
+            masks += (dir_error == dir_error.min())
+            # And that we're exceeding deadzone
+            masks += is_dodges
+            optimal += 2
+        else:
+            # Make sure we're not exceeding deadzone
+            masks += ~is_dodges
+            optimal += 1
+    elif car.on_ground:
+        # Prioritize throttle, steer and handbrake
+        error = np.abs(action_options[:, 0] - replay_action[0])
+        masks += error == error.min()
+        error = np.abs(action_options[:, 1] - replay_action[1])
+        masks += error == error.min()
+        masks += action_options[:, 7] == replay_action[7]
+        optimal += 3
+    else:
+        # Prioritize pitch, yaw and roll
+        error = np.linalg.norm(action_options[:, 2:5] - replay_action[2:5]).sum(axis=1)
+        masks += error == error.min()
+        optimal += 1
 
     mx = masks.max()
     mask = masks == mx

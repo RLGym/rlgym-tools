@@ -44,9 +44,10 @@ class AerialDistanceReward(RewardFunction[AgentID, GameState, float]):
                     self.distances[agent] = 0
                     self.last_touch_agent = None
                 else:
-                    dist = (np.linalg.norm(car.physics.position - self.prev_state.cars[agent].physics.position)
-                            + np.linalg.norm(state.ball.position - self.prev_state.ball.position))
-                    self.distances[agent] += dist
+                    dist_car = np.linalg.norm(car.physics.position - self.prev_state.cars[agent].physics.position)
+                    dist_ball = np.linalg.norm(state.ball.position - self.prev_state.ball.position)
+                    self.distances[agent] += (dist_car * self.car_distance_weight
+                                              + dist_ball * self.ball_distance_weight)
             if car.ball_touches > 0:
                 rewards[agent] = self.distances[agent]
                 if self.last_touch_agent == agent:
@@ -54,7 +55,7 @@ class AerialDistanceReward(RewardFunction[AgentID, GameState, float]):
                     self.distances[agent] = 0
                 else:
                     touch_height = float(car.physics.position[2] + state.ball.position[2]) / 2
-                    touch_height = max(0, touch_height - RAMP_HEIGHT)  # Clamp to 0
+                    touch_height = max(0.0, touch_height - RAMP_HEIGHT)  # Clamp to 0
                     rewards[agent] += touch_height * self.touch_height_weight
                     self.last_touch_agent = agent
         self.prev_state = state

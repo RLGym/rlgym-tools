@@ -1,6 +1,10 @@
 import numpy as np
 from rlgym.rocket_league.common_values import CAR_MAX_ANG_VEL, TICKS_PER_SECOND
 
+# Code by the legendary Sam Mish, from https://www.smish.dev/rocket_league/inverse_aerial_control/
+# NOTE: Modified to produce full-magnitude inputs when at max angvel (thanks Zealan)
+
+
 T_r = -36.07956616966136  # torque coefficient for roll
 T_p = -12.14599781908070  # torque coefficient for pitch
 T_y = 8.91962804287785  # torque coefficient for yaw
@@ -12,8 +16,6 @@ MIN_PITCH_DELTA_PER_TICK = 0.05
 
 
 def aerial_inputs(ang_vel_start, ang_vel_end, rot_mat_start, rot_mat_end, dt, is_flipping=False):
-    # Code by the legendary Sam Mish, from https://www.smish.dev/rocket_league/inverse_aerial_control/
-    # NOTE: Modified to produce full-magnitude inputs when at max angvel
     scale = 1.0
     if np.linalg.norm(ang_vel_end) >= CAR_MAX_ANG_VEL - 0.01:
         scale = 1.25  # Scale up so we don't get partial inputs when we hit the max angular velocity
@@ -62,12 +64,5 @@ def aerial_inputs(ang_vel_start, ang_vel_end, rot_mat_start, rot_mat_end, dt, is
         if abs(ang_vel_local_start[1]) > abs(ang_vel_local_end[1]) + (MIN_PITCH_DELTA_PER_TICK * TICKS_PER_SECOND * dt):
             # Flip cancel
             u[1] = np.sign(ang_vel_local_start[1])
-        # else:
-        #     u[0] = 0
-        #     u[2] = 0
-        # elif abs(u[2]) > 0.1:
-        #     print("Hei")
-        # elif abs(u[0]) > 0.1:
-        #     print("Hei")
 
     return u[1], u[2], u[0]  # pitch, yaw, roll

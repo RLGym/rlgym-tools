@@ -3,6 +3,8 @@ import math
 from rlgym.rocket_league.common_values import TICKS_PER_SECOND
 
 
+# Utility functions for converting between gamma, half-life, and horizon.
+
 def half_life_to_gamma(half_life_seconds: float, tick_skip: int) -> float:
     half_life_ticks = half_life_seconds * TICKS_PER_SECOND
     half_life_steps = half_life_ticks / tick_skip

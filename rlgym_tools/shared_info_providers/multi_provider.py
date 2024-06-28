@@ -5,6 +5,9 @@ from rlgym.rocket_league.api import GameState
 
 
 class MultiProvider(SharedInfoProvider[AgentID, GameState]):
+    """
+    Wrapper to use multiple SharedInfoProviders at once.
+    """
 
     def __init__(self, *providers: SharedInfoProvider):
         self.providers = providers

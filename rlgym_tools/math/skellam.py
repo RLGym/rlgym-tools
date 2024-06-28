@@ -4,6 +4,8 @@ from rlgym.rocket_league.common_values import BACK_WALL_Y, SIDE_WALL_X, GOAL_HEI
 from scipy.stats.distributions import skellam, expon, truncexpon
 import numpy as np
 
+# Win probability estimation using Skellam distribution
+
 AVERAGE_EPISODE_LENGTH = np.array([26.32, 47.16, 68.52])
 GOALS_PER_MINUTE = 60 / AVERAGE_EPISODE_LENGTH
 

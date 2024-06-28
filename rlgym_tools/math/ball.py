@@ -5,6 +5,8 @@ from rlgym.rocket_league.api import PhysicsObject
 from rlgym.rocket_league.common_values import TICKS_PER_SECOND, GRAVITY, BACK_WALL_Y, BALL_RADIUS, GOAL_HEIGHT, \
     GOAL_CENTER_TO_POST
 
+# Utility functions for ball physics
+
 BALL_RESTING_HEIGHT = 93.15
 GOAL_THRESHOLD = 5215.5  # Tested in-game with BakkesMod
 

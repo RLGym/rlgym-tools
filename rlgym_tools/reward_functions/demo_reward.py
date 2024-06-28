@@ -7,7 +7,7 @@ import numpy as np
 
 
 class DemoReward(RewardFunction[AgentID, GameState, float]):
-    def __init__(self, attacker_reward=1, victim_punishment=1):
+    def __init__(self, attacker_reward: float = 1.0, victim_punishment: float = 1.0):
         self.attacker_reward = attacker_reward
         self.victim_punishment = victim_punishment
 
