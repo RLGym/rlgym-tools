@@ -16,7 +16,7 @@ setup(
     author='Rolv-Arild Braaten, Lucas Emery and Matthew Allen',
     url='https://rlgym.github.io',
     install_requires=[
-        'rlgym>=2.0.0',
+    'rlgym>=2.0.0rc0',  # Including release candidates starting from 2.0.0
     ],
     python_requires='>=3.9',
     license='Apache 2.0',
