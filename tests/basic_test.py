@@ -11,7 +11,7 @@ from rlgym.rocket_league.state_mutators import MutatorSequence
 
 from rlgym_tools.action_parsers.action_history_wrapper import ActionHistoryWrapper
 from rlgym_tools.action_parsers.advanced_lookup_table_action import AdvancedLookupTableAction
-from rlgym_tools.action_parsers.delayed_action import DelayedAction
+from rlgym_tools.action_parsers.delayed_action import QueuedAction
 from rlgym_tools.done_conditions.game_condition import GameCondition
 from rlgym_tools.math.gamma import half_life_to_gamma
 from rlgym_tools.obs_builders.relative_default_obs import RelativeDefaultObs
@@ -57,7 +57,7 @@ def main():
         ),
         obs_builder=RelativeDefaultObs(),
         action_parser=ActionHistoryWrapper(
-            DelayedAction(
+            QueuedAction(
                 RepeatAction(
                     AdvancedLookupTableAction(),
                     repeats=tick_skip),

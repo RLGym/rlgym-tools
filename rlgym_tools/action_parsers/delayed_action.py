@@ -1,42 +1,37 @@
-from typing import Dict, Any, Tuple, List
+from typing import Tuple, Dict, Any, List
 
 import numpy as np
-from rlgym.api import ActionParser, AgentID, ActionType, EngineActionType, ActionSpaceType
+from rlgym.api import ActionParser, AgentID, ActionType, StateType, EngineActionType, ActionSpaceType
 from rlgym.rocket_league.api import GameState
 
 
 class DelayedAction(ActionParser[AgentID, np.ndarray, np.ndarray, GameState, Tuple[AgentID, np.ndarray]]):
-    def __init__(self, parser: ActionParser, action_queue_size: int = 1):
-        """
-        DelayedAction maintains a queue of actions to execute and adds parsed actions to the queue.
+    """
+    DelayedAction delays all actions by a specified number of ticks. The first n actions are delayed by n ticks, and
+    """
 
-        :param parser: the action parser to parse actions that are then added to the queue.
-        """
-        super().__init__()
-        self.parser = parser
-        self.action_queue_size = action_queue_size
-        self.action_queue = {}
-        self.is_initial = True
+    def __init__(self, action_parser: ActionParser, delay_ticks: int = 1):
+        self.action_parser = action_parser
+        self.delay_ticks = delay_ticks
+        self.delayed_actions = None
 
     def get_action_space(self, agent: AgentID) -> ActionSpaceType:
-        return self.parser.get_action_space(agent)
+        return self.action_parser.get_action_space(agent)
 
-    def reset(self, agents: List[AgentID], initial_state: GameState, shared_info: Dict[str, Any]) -> None:
-        self.parser.reset(agents, initial_state, shared_info)
-        self.action_queue = {k: [] for k in initial_state.cars.keys()}
-        self.is_initial = True
-        shared_info["action_queue"] = self.action_queue
+    def reset(self, agents: List[AgentID], initial_state: StateType, shared_info: Dict[str, Any]) -> None:
+        self.action_parser.reset(agents, initial_state, shared_info)
+        self.delayed_actions = {agent: np.zeros((self.delayed_actions, 8)) for agent in agents}
 
-    def parse_actions(self, actions: Dict[AgentID, ActionType], state: GameState, shared_info: Dict[str, Any]) \
+    def parse_actions(self, actions: Dict[AgentID, ActionType], state: StateType, shared_info: Dict[str, Any]) \
             -> Dict[AgentID, EngineActionType]:
-        parsed_actions = self.parser.parse_actions(actions, state, shared_info)
+        parsed_actions = self.action_parser.parse_actions(actions, state, shared_info)
         returned_actions = {}
-        if self.is_initial:
-            for agent, action in parsed_actions.items():
-                self.action_queue[agent] = [action] * self.action_queue_size
-            self.is_initial = False
         for agent, action in parsed_actions.items():
-            self.action_queue[agent].append(action)
-            returned_actions[agent] = self.action_queue[agent].pop(0)
-        shared_info["action_queue"] = self.action_queue
+            del_action = self.delayed_actions[agent]
+            ret_action = np.zeros_like(action)
+            ret_action[:self.delay_ticks] = del_action
+            ret_action[self.delay_ticks:] = action[:-self.delay_ticks]
+            del_action[:] = action[-self.delay_ticks:]
+            returned_actions[agent] = ret_action
+        shared_info["delayed_actions"] = self.delayed_actions
         return returned_actions
