@@ -7,7 +7,8 @@ from rlgym.rocket_league.api import GameState
 
 class DelayedAction(ActionParser[AgentID, np.ndarray, np.ndarray, GameState, Tuple[AgentID, np.ndarray]]):
     """
-    DelayedAction delays all actions by a specified number of ticks. The first n actions are delayed by n ticks, and
+    DelayedAction delays all actions by a specified number of ticks. The last tick(s) of the previous action are
+    prepended to the current action. RLBot has a 1-tick delay so this is essential for full reproducibility.
     """
 
     def __init__(self, action_parser: ActionParser, delay_ticks: int = 1):
@@ -20,7 +21,7 @@ class DelayedAction(ActionParser[AgentID, np.ndarray, np.ndarray, GameState, Tup
 
     def reset(self, agents: List[AgentID], initial_state: StateType, shared_info: Dict[str, Any]) -> None:
         self.action_parser.reset(agents, initial_state, shared_info)
-        self.delayed_actions = {agent: np.zeros((self.delayed_actions, 8)) for agent in agents}
+        self.delayed_actions = {agent: np.zeros((self.delay_ticks, 8)) for agent in agents}
 
     def parse_actions(self, actions: Dict[AgentID, ActionType], state: StateType, shared_info: Dict[str, Any]) \
             -> Dict[AgentID, EngineActionType]:
