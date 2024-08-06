@@ -475,7 +475,7 @@ def get_valid_action_options(car: Car, replay_action: np.ndarray, action_options
              don't provide good enough coverage.
     """
     optimal = 0
-    masks = np.zeros(len(action_options), dtype=bool)
+    masks = np.zeros(len(action_options), dtype=int)
 
     if car.on_ground or car.can_flip:
         masks += action_options[:, 5] == replay_action[5]
@@ -483,7 +483,7 @@ def get_valid_action_options(car: Car, replay_action: np.ndarray, action_options
 
     if car.boost_amount > 0:
         masks += action_options[:, 6] == replay_action[6]  # Boost
-    optimal += 1
+        optimal += 1
 
     if replay_action[5] == 1 and not car.on_ground and car.can_flip:
         # Double jump or dodge
