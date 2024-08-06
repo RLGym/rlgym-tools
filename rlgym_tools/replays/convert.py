@@ -260,6 +260,7 @@ def _prepare_segment_dfs(replay, start_frame, end_frame, linear_interpolation, p
         # If something repeats for 4 or more frames, assume it's not a real repeat, just the player standing still
         is_repeat &= (is_repeat.rolling(4).sum() < 4)
         is_demoed = pdf["pos_x"].isna()
+        pdf[["throttle", "steer"]] = pdf[["throttle", "steer"]].ffill().fillna(255 / 2)
         pdf = pdf.ffill().fillna(0.)
         pdf["is_repeat"] = is_repeat.astype(float)
         pdf["is_demoed"] = is_demoed.astype(float)
