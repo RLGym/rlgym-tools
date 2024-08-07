@@ -482,7 +482,10 @@ def get_valid_action_options(car: Car, replay_action: np.ndarray, action_options
         masks += 10 * (action_options[:, 5] == replay_action[5])
         optimal += 10
 
+    is_boosting = False
     if car.boost_amount > 0:
+        # Boost is weighted extra so that it's not countered by throttle later
+        is_boosting = replay_action[6] == 1
         masks += action_options[:, 6] == replay_action[6]  # Boost
         optimal += 1
 
@@ -505,8 +508,9 @@ def get_valid_action_options(car: Car, replay_action: np.ndarray, action_options
             optimal += 1
     elif car.on_ground:
         # Prioritize throttle, steer and handbrake
-        error = np.abs(action_options[:, 0] - replay_action[0])
-        masks += error == error.min()
+        if not is_boosting:
+            error = np.abs(action_options[:, 0] - replay_action[0])
+            masks += error == error.min()
         error = np.abs(action_options[:, 1] - replay_action[1])
         masks += error == error.min()
         masks += action_options[:, 7] == replay_action[7]
