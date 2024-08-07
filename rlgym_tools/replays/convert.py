@@ -486,8 +486,8 @@ def get_valid_action_options(car: Car, replay_action: np.ndarray, action_options
     if car.boost_amount > 0:
         # Boost is weighted extra so that it's not countered by throttle later
         is_boosting = replay_action[6] == 1
-        masks += action_options[:, 6] == replay_action[6]  # Boost
-        optimal += 1
+        masks += 2 * (action_options[:, 6] == replay_action[6])  # Boost
+        optimal += 2
 
     if replay_action[5] == 1 and not car.on_ground and car.can_flip:
         # Double jump or dodge
