@@ -478,8 +478,9 @@ def get_valid_action_options(car: Car, replay_action: np.ndarray, action_options
     masks = np.zeros(len(action_options), dtype=int)
 
     if car.on_ground or car.can_flip:
-        masks += action_options[:, 5] == replay_action[5]
-        optimal += 1
+        # Jumps/dodges take precedence over everything else
+        masks += 10 * (action_options[:, 5] == replay_action[5])
+        optimal += 10
 
     if car.boost_amount > 0:
         masks += action_options[:, 6] == replay_action[6]  # Boost
