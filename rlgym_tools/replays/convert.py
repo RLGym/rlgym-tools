@@ -511,10 +511,11 @@ def get_valid_action_options(car: Car, replay_action: np.ndarray, action_options
         if not is_boosting:
             error = np.abs(action_options[:, 0] - replay_action[0])
             masks += error == error.min()
+            optimal += 1
         error = np.abs(action_options[:, 1] - replay_action[1])
         masks += error == error.min()
         masks += action_options[:, 7] == replay_action[7]
-        optimal += 3
+        optimal += 2
     else:
         # Prioritize pitch, yaw and roll
         error = np.linalg.norm(action_options[:, 2:5] - replay_action[2:5], axis=1)
