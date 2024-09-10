@@ -1,9 +1,7 @@
 from typing import Any, Dict, List
+
 from rlgym.api import RewardFunction, AgentID
 from rlgym.rocket_league.api import GameState
-from rlgym.rocket_league.common_values import CAR_MAX_SPEED
-
-import numpy as np
 
 
 class DemoReward(RewardFunction[AgentID, GameState, float]):
