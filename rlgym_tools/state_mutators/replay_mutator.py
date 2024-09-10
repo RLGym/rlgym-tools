@@ -26,7 +26,7 @@ class ReplayMutator(StateMutator[GameState]):
         return np.ones(len(self.states)) / len(self.states)
 
     def apply(self, state: GameState, shared_info: Dict[str, Any]) -> None:
-        replay_frame = random.choices(self.states, weights=self.probabilities)[0]
+        replay_frame = np.random.choice(self.states, p=self.probabilities)
         new_state = replay_frame.state
         state.tick_count = new_state.tick_count
         state.goal_scored = new_state.goal_scored
@@ -46,7 +46,7 @@ class ReplayMutator(StateMutator[GameState]):
         states = []
         for replay_file in replay_files:
             parsed_replay = ParsedReplay.load(replay_file, carball_path)
-            frame = random.randint(0, frame_skip)  # Randomize starting frame to increase diversity
+            frame = random.randrange(0, frame_skip)  # Randomize starting frame to increase diversity
             for replay_frame in replay_to_rlgym(parsed_replay, interpolation, predict_pyr=True, calculate_error=False):
                 if frame % frame_skip == 0:
                     states.append(replay_frame)
