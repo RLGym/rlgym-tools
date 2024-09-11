@@ -17,5 +17,6 @@ class WavedashReward(RewardFunction[AgentID, GameState, float]):
             agent: float(state.cars[agent].on_ground and self.prev_state[agent].is_flipping)
             for agent in agents
         }
+        self.prev_state = state
 
         return rewards

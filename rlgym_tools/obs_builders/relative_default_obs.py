@@ -2,21 +2,21 @@ import math
 from typing import List, Dict, Any, Tuple
 
 import numpy as np
-
 from rlgym.api import ObsBuilder, AgentID
-from rlgym.rocket_league.api import Car, GameState
-from rlgym.rocket_league.common_values import ORANGE_TEAM
+from rlgym.rocket_league.api import Car, GameState, PhysicsObject
+
+from rlgym_tools.math.relative import relative_physics, dodge_relative_physics
 
 
 class RelativeDefaultObs(ObsBuilder[AgentID, np.ndarray, GameState, Tuple[str, int]]):
     """
     Relative version of the default observation builder.
-    Agent's car uses absolute reference frame, other cars are relative to the agent's car.
+    Agent's car uses absolute reference frame, other cars and ball are relative to the agent's car.
     """
 
     def __init__(self, zero_padding=3, pos_coef=1 / 2300, ang_coef=1 / math.pi, lin_vel_coef=1 / 2300,
                  ang_vel_coef=1 / math.pi,
-                 pad_timer_coef=1 / 10):
+                 pad_timer_coef=1 / 10, dodge_relative=False):
         """
         :param zero_padding: Number of max cars per team, if not None the obs will be zero padded
         :param pos_coef: Position normalization coefficient
@@ -32,6 +32,7 @@ class RelativeDefaultObs(ObsBuilder[AgentID, np.ndarray, GameState, Tuple[str, i
         self.ANG_VEL_COEF = ang_vel_coef
         self.PAD_TIMER_COEF = pad_timer_coef
         self.zero_padding = zero_padding
+        self.relative_fn = relative_physics if not dodge_relative else dodge_relative_physics
 
     def get_obs_space(self, agent: AgentID) -> Tuple[str, int]:
         if self.zero_padding is not None:
@@ -53,18 +54,20 @@ class RelativeDefaultObs(ObsBuilder[AgentID, np.ndarray, GameState, Tuple[str, i
     def _build_obs(self, agent: AgentID, state: GameState, shared_info: Dict[str, Any]) -> np.ndarray:
         car = state.cars[agent]
         if car.is_orange:
-            inverted = True
-            ball = state.inverted_ball
+            physics = car.inverted_physics
             pads = state.inverted_boost_pad_timers
         else:
-            inverted = False
-            ball = state.ball
+            physics = car.physics
             pads = state.boost_pad_timers
 
-        obs = [  # Global stuff
-            ball.position * self.POS_COEF,
-            ball.linear_velocity * self.LIN_VEL_COEF,
-            ball.angular_velocity * self.ANG_VEL_COEF,
+        others = sorted(k for k in state.cars.keys() if k != agent)
+
+        rel_ball, *rel_cars = relative_physics(car.physics,
+                                               [state.ball] + [state.cars[other].physics for other in others])
+
+        car_obs = self._make_player_obs(physics, car)
+
+        general = [  # Global stuff
             pads * self.PAD_TIMER_COEF,
             [  # Partially observable variables
                 car.is_holding_jump,
@@ -79,13 +82,17 @@ class RelativeDefaultObs(ObsBuilder[AgentID, np.ndarray, GameState, Tuple[str, i
             ]
         ]
 
-        car_obs = self._generate_absolute_car_obs(car, inverted)
-        obs.append(car_obs)
+        ball = [
+            rel_ball.position * self.POS_COEF,
+            rel_ball.linear_velocity * self.LIN_VEL_COEF,
+            rel_ball.angular_velocity * self.ANG_VEL_COEF,
+        ]
 
         allies = []
         enemies = []
 
-        for other, other_car in state.cars.items():
+        for other, rel_physics in zip(others, rel_cars):
+            other_car = state.cars[other]
             if other == agent:
                 continue
 
@@ -94,7 +101,7 @@ class RelativeDefaultObs(ObsBuilder[AgentID, np.ndarray, GameState, Tuple[str, i
             else:
                 team_obs = enemies
 
-            team_obs.append(self._generate_relative_car_obs(car, other_car))
+            team_obs.extend(self._make_player_obs(rel_physics, other_car))
 
         if self.zero_padding is not None:
             # Padding for multi game mode
@@ -103,17 +110,12 @@ class RelativeDefaultObs(ObsBuilder[AgentID, np.ndarray, GameState, Tuple[str, i
             while len(enemies) < self.zero_padding:
                 enemies.append(np.zeros_like(car_obs))
 
-        obs.extend(allies)
-        obs.extend(enemies)
+        obs = car_obs + general + ball + allies + enemies
+
         return np.concatenate(obs)
 
-    def _generate_absolute_car_obs(self, car: Car, inverted: bool) -> np.ndarray:
-        if inverted:
-            physics = car.inverted_physics
-        else:
-            physics = car.physics
-
-        return np.concatenate([
+    def _make_player_obs(self, physics: PhysicsObject, car: Car) -> List:
+        return [
             physics.position * self.POS_COEF,
             physics.forward,
             physics.up,
@@ -124,27 +126,4 @@ class RelativeDefaultObs(ObsBuilder[AgentID, np.ndarray, GameState, Tuple[str, i
              int(car.on_ground),
              int(car.is_boosting),
              int(car.is_supersonic)]
-        ])
-
-    def _generate_relative_car_obs(self, base_car: Car, other_car: Car) -> np.ndarray:
-        # No inverted since team inversion does not affect relative positions
-        rot_mtx = base_car.physics.rotation_mtx
-
-        relative_pos = (other_car.physics.position - base_car.physics.position) @ rot_mtx
-        relative_forward = other_car.physics.forward @ rot_mtx
-        relative_up = other_car.physics.up @ rot_mtx
-        relative_lin_vel = (other_car.physics.linear_velocity - base_car.physics.linear_velocity) @ rot_mtx
-        relative_ang_vel = (other_car.physics.angular_velocity - base_car.physics.angular_velocity) @ rot_mtx
-
-        return np.concatenate([
-            relative_pos * self.POS_COEF,
-            relative_forward,
-            relative_up,
-            relative_lin_vel * self.LIN_VEL_COEF,
-            relative_ang_vel * self.ANG_VEL_COEF,
-            [other_car.boost_amount,
-             other_car.demo_respawn_timer,
-             int(other_car.on_ground),
-             int(other_car.is_boosting),
-             int(other_car.is_supersonic)]
-        ])
+        ]
