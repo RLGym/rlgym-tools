@@ -56,19 +56,26 @@ class ParsedReplay:
             replay_dir = Path(replay_dir)
 
         def load_files(rdir):
-            with (rdir / "metadata.json").open("r", encoding="utf8") as f:
-                metadata = json.load(f)
-            with (rdir / "analyzer.json").open("r", encoding="utf8") as f:
-                analyzer = json.load(f)
-            ball_df = load_parquet(rdir / "__ball.parquet")
-            game_df = load_parquet(rdir / "__game.parquet")
+            try:
+                with (rdir / "metadata.json").open("r", encoding="utf8") as f:
+                    metadata = json.load(f)
+                with (rdir / "analyzer.json").open("r", encoding="utf8") as f:
+                    analyzer = json.load(f)
+                ball_df = load_parquet(rdir / "__ball.parquet")
+                game_df = load_parquet(rdir / "__game.parquet")
 
-            player_dfs = {}
-            for player_file in rdir.glob("player_*.parquet"):
-                player_id = player_file.name.split("_")[1].split(".")[0]
-                player_dfs[player_id] = load_parquet(player_file)
+                player_dfs = {}
+                for player_file in rdir.glob("player_*.parquet"):
+                    player_id = player_file.name.split("_")[1].split(".")[0]
+                    player_dfs[player_id] = load_parquet(player_file)
 
-            return ParsedReplay(metadata, analyzer, game_df, ball_df, player_dfs)
+                return ParsedReplay(metadata, analyzer, game_df, ball_df, player_dfs)
+            except FileNotFoundError as e:
+                try:
+                    with (rdir / "carball.e.log").open("r", encoding="utf8") as f:
+                        raise ValueError(f"Error processing replay: {f.read()}")
+                except FileNotFoundError:
+                    raise e
 
         if not replay_dir.is_dir():
             # Assume it's a replay file

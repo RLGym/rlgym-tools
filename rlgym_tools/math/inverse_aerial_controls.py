@@ -12,8 +12,6 @@ D_r = -4.47166302201591  # drag coefficient for roll
 D_p = -2.798194258050845  # drag coefficient for pitch
 D_y = -1.886491900437232  # drag coefficient for yaw
 
-MIN_PITCH_DELTA_PER_TICK = 0.05
-
 
 def aerial_inputs(ang_vel_start, ang_vel_end, rot_mat_start, rot_mat_end, dt, is_flipping=False):
     scale = 1.0
@@ -61,7 +59,7 @@ def aerial_inputs(ang_vel_start, ang_vel_end, rot_mat_start, rot_mat_end, dt, is
             tst[2, 0] * ang_vel_end[0] + tst[2, 1] * ang_vel_end[1] + tst[2, 2] * ang_vel_end[2]
         ])
 
-        if abs(ang_vel_local_start[1]) > abs(ang_vel_local_end[1]) + (MIN_PITCH_DELTA_PER_TICK * TICKS_PER_SECOND * dt):
+        if abs(ang_vel_local_start[1]) > abs(ang_vel_local_end[1]) * scale:
             # Flip cancel
             u[1] = np.sign(ang_vel_local_start[1])
 

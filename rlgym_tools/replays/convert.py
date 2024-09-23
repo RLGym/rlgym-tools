@@ -1,3 +1,4 @@
+import time
 import warnings
 from copy import deepcopy
 from dataclasses import dataclass
@@ -12,6 +13,7 @@ from rlgym.rocket_league.state_mutators import FixedTeamSizeMutator, KickoffMuta
 
 from rlgym_tools.math.ball import ball_hit_ground
 from rlgym_tools.math.inverse_aerial_controls import aerial_inputs
+from rlgym_tools.misc.action import Action
 from rlgym_tools.shared_info_providers.scoreboard_provider import ScoreboardInfo
 
 try:
@@ -40,7 +42,7 @@ class ReplayFrame:
 
 
 def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"] = "rocketsim",
-                    predict_pyr=True, calculate_error=False):
+                    predict_pyr=True, calculate_error=False, action_options=None):
     if interpolation not in ("none", "linear", "rocketsim"):
         raise ValueError(f"Interpolation mode {interpolation} not recognized")
     rocketsim_interpolation = interpolation == "rocketsim"
@@ -60,7 +62,7 @@ def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"
     total_quat_error = {}
     total_vel_error = {}
     total_ang_vel_error = {}
-
+    scoreboard = None
     # Track scoreline
     blue = orange = 0
     final_goal_diff = sum(-1 if goal["is_orange"] else 1 for goal in replay.metadata["game"]["goals"])
@@ -164,18 +166,49 @@ def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"
             update_age = {}
             for uid, player_row in zip(player_ids, car_rows):
                 car = state.cars[uid]
-                if calculate_error:
+                if calculate_error:  # and i > 0 and not player_rows[player_ids.index(uid)][i - 1].is_repeat:
                     action, error_pos, error_quat, error_vel, error_ang_vel \
                         = _update_car_and_get_action(car, linear_interpolation, player_row, state,
-                                                     calculate_error=True)
+                                                     calculate_error=True, i=i)
 
                     if frame != start_frame and not np.isnan(error_pos):
                         total_pos_error.setdefault(uid, []).append(error_pos)
                         total_quat_error.setdefault(uid, []).append(error_quat)
                         total_vel_error.setdefault(uid, []).append(error_vel)
                         total_ang_vel_error.setdefault(uid, []).append(error_ang_vel)
+
+                    print(scoreboard)
+                    print(f"{uid}, {car.on_ground=}, {car.boost_amount=:.2f}, {car.can_flip=}, {car.is_flipping=}")
+                    print("replay action:\n\t" + str(Action.from_numpy(action)))
+
+                    for method in [get_weighted_action_options, get_best_action_options]:
+                        t0 = time.perf_counter()
+                        probs = method(car, action, action_options)
+                        t1 = time.perf_counter()
+                        idxs = np.where(probs > 0)[0]
+                        s = f"{method.__name__}: ({(t1 - t0) * 1000:.3f}ms)\n"
+                        if len(idxs) > 1:
+                            weighted_average = np.average(action_options, axis=0, weights=probs)
+                            s += f"WA: {Action.from_numpy(weighted_average)}\n"
+                        for idx in sorted(idxs, key=lambda k: -probs[k]):
+                            a = action_options[idx]
+                            a = Action.from_numpy(a)
+                            s += f"\t{a} ({probs[idx]:.0%})\n"
+                        print(s[:-1])
+
+                    # if not np.allclose(probs, probs2):
+                    #     debug = True
+
+                    # probs = np.ones(len(action_options)) / len(action_options)
+                    # probs = (action_options == 0).all(axis=1).astype(float)
+                    # probs = get_simple_action_options(car, action, action_options)
+                    # probs = get_weighted_action_options(car, action, action_options)
+                    # probs = get_best_action_options(car, action, action_options, greedy=False)
+
+                    # action = action_options[np.random.choice(len(action_options), p=probs)]
+                    print()
                 else:
-                    action = _update_car_and_get_action(car, linear_interpolation, player_row, state)
+                    action = _update_car_and_get_action(car, linear_interpolation, player_row, state, i=i)
 
                 actions[uid] = action
                 update_age[uid] = player_row.update_age if not player_row.is_demoed else 0
@@ -235,11 +268,15 @@ def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"
                 error[uid] = np.array(errors)
                 axs[i].plot(error[uid], label=uid)
             all_errors = np.concatenate(list(error.values()))
-            print(f"{name} error: \n"
-                  f"\tMean: {np.mean(all_errors)}\n"
-                  f"\tStd: {np.std(all_errors)}\n"
-                  f"\tMedian: {np.median(all_errors)}\n"
-                  f"\tMax: {np.max(all_errors)}")
+
+            # print(f"{name} error: \n"
+            #       f"\tMean: {np.mean(all_errors):.3g}\n"
+            #       f"\tStd: {np.std(all_errors):.3g}\n"
+            #       f"\tMedian: {np.median(all_errors):.3g}\n"
+            #       f"\tMax: {np.max(all_errors):.3g}")
+            print(f"{name} error:")
+            print("\n".join([str(np.mean(all_errors)), str(np.std(all_errors)),
+                             str(np.median(all_errors)), str(np.max(all_errors))]))
             # axs[i].hist(all_errors, bins=100)
             # axs[i].set_yscale("log")
             axs[i].set_title(name)
@@ -250,7 +287,9 @@ def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"
 
 def _prepare_segment_dfs(replay, start_frame, end_frame, linear_interpolation, predict_pyr):
     game_df = replay.game_df.loc[start_frame:end_frame].astype(float)
-    ball_df = replay.ball_df.loc[start_frame:end_frame].ffill().fillna(0.).astype(float)
+    ball_df = replay.ball_df.loc[start_frame:end_frame].astype(float)
+    ball_df["quat_w"] = ball_df["quat_w"].fillna(1.0)
+    ball_df = ball_df.ffill().fillna(0.)
     player_dfs = {}
     for uid, pdf in replay.player_dfs.items():
         pdf = pdf.loc[start_frame:end_frame].astype(float)
@@ -325,7 +364,7 @@ def _prepare_segment_dfs(replay, start_frame, end_frame, linear_interpolation, p
 
 
 def _update_car_and_get_action(car: Car, linear_interpolation: bool, player_row, state: GameState,
-                               calculate_error=False):
+                               calculate_error=False, i=0):
     error_pos = error_quat = error_vel = error_ang_vel = np.nan
     if linear_interpolation or not player_row.is_repeat:
         true_pos = (player_row.pos_x, player_row.pos_y, player_row.pos_z)
@@ -462,67 +501,193 @@ def pyr_from_dataframe(game_df, player_df):
     return pyrs
 
 
-def get_valid_action_options(car: Car, replay_action: np.ndarray, action_options: np.ndarray, dodge_deadzone=0.5):
+def filter_action_options(car: Car, replay_action: np.ndarray, action_options: np.ndarray, greedy_continuous: bool,
+                          deadzone: float = 0.5):
+    # Filters out actions that are definitely not correct
+    margin = 1e-3
+
+    candidates = action_options.copy()
+
+    jump_matters = (car.on_ground or car.can_flip) and not car.is_holding_jump
+    boost_matters = car.boost_amount > 0
+    is_grounded = car.on_ground and replay_action[5] == 0
+    is_aerial = not car.on_ground and replay_action[5] == 0
+
+    if jump_matters:
+        # Jump
+        jump_error = np.abs(candidates[:, 5] - replay_action[5])
+        candidates = candidates[jump_error == jump_error.min()]
+
+        if not car.on_ground and replay_action[5] == 1:
+            # Check if it's a dodge or a double jump
+            is_dodge = np.abs(replay_action[2:5]).sum() >= deadzone
+            is_dodges = np.abs(candidates[:, 2:5]).sum(axis=1) >= deadzone  # Jump is already filtered
+            dodge_error = np.abs(is_dodges - float(is_dodge))
+            candidates = candidates[dodge_error == dodge_error.min()]
+
+            if is_dodge:
+                # Check that the dodge direction error is minimized
+                dodge_dir = np.array([replay_action[2], replay_action[3] + replay_action[4]])
+                dodge_dirs = np.array([candidates[:, 2], candidates[:, 3] + candidates[:, 4]]).T
+                if np.all(dodge_dir == 0):
+                    # Stall
+                    dir_dot = np.all(dodge_dirs == 0, axis=1)
+                else:
+                    dodge_dir /= np.linalg.norm(dodge_dir)
+                    m = np.any(dodge_dirs != 0, axis=1)
+                    dodge_dirs[m] /= np.linalg.norm(dodge_dirs[m], axis=1, keepdims=True)
+                    dir_dot = np.dot(dodge_dirs, dodge_dir)
+                candidates = candidates[dir_dot == dir_dot.max()]
+
+    if boost_matters:
+        # Boost
+        boost_error = np.abs(candidates[:, 6] - replay_action[6])
+        candidates = candidates[boost_error == boost_error.min()]
+
+    if is_grounded:  # Grounded
+        # Handbrake
+        handbrake_error = np.abs(candidates[:, 7] - replay_action[7])
+        candidates = candidates[handbrake_error == handbrake_error.min()]
+
+        # Throttle
+        throttle = replay_action[0] if (replay_action[6] == 0 and boost_matters) else 1
+        if abs(throttle) >= margin:
+            # There is a braking effect when
+            throttle_dir = np.sign(throttle)
+            throttle_dirs = np.sign(candidates[:, 0]) * (abs(candidates[:, 0]) >= margin)
+            dir_error = throttle_dirs == -throttle_dir
+            candidates = candidates[dir_error == dir_error.min()]
+
+        if greedy_continuous:
+            throttle_error = np.abs(candidates[:, 0] - throttle)
+            candidates = candidates[throttle_error == throttle_error.min()]
+
+            steer_error = np.abs(candidates[:, 1] - replay_action[1])
+            candidates = candidates[steer_error == steer_error.min()]
+    elif is_aerial:  # Aerial
+        if greedy_continuous:
+            # Pitch, yaw, roll
+            rotate_dir = replay_action[2:5]
+            rotate_dirs = candidates[:, 2:5]
+
+            dir_error = np.linalg.norm(rotate_dirs - rotate_dir, axis=1)
+            candidates = candidates[dir_error == dir_error.min()]
+
+    # Steer (on ground) and pitch/yaw/roll (in air) are ignored due to being continuous
+    return candidates
+
+
+def get_best_action_options(car: Car, replay_action: np.ndarray, action_options: np.ndarray, dodge_deadzone=0.5,
+                            greedy=True) -> np.ndarray:
     """
-    Get the valid action options for a car given a replay action and a set of action options.
-    :param car: The car to get the valid actions for
-    :param replay_action: The action from the replay
-    :param action_options: The action options to choose from
+    Produces a probability distribution over the action options, where the best options are given the highest
+    probability.
+
+    :param car: The car state
+    :param replay_action: The action to match
+    :param action_options: The available action options
     :param dodge_deadzone: The deadzone for dodges
-    :return: A tuple of mask and whether the actions in the mask are optimal
-             E.g. is this as good as we could've possibly done, or are there conflicts about what's best.
-             If the actions are not always optimal, it might be a sign that the action options
-             don't provide good enough coverage.
+    :param greedy: If True, after filtering candidates it picks the closest ones by Euclidean distance.
+    :return: The probabilities for each action option
     """
-    optimal = 0
-    masks = np.zeros(len(action_options), dtype=int)
+    candidates = filter_action_options(car, replay_action, action_options, True, dodge_deadzone)
 
-    if car.on_ground or car.can_flip:
-        # Jumps/dodges take precedence over everything else
-        masks += 10 * (action_options[:, 5] == replay_action[5])
-        optimal += 10
+    if greedy:
+        naive_error = np.linalg.norm(candidates - replay_action, axis=1)
+        candidates = candidates[naive_error == naive_error.min()]
 
-    is_boosting = False
-    if car.boost_amount > 0:
-        # Boost is weighted extra so that it's not countered by throttle later
-        is_boosting = replay_action[6] == 1
-        masks += 2 * (action_options[:, 6] == replay_action[6])  # Boost
-        optimal += 2
+    probs = np.zeros(len(action_options), dtype=float)
+    for i, c in enumerate(candidates):
+        probs[np.all(action_options == c, axis=1)] = 1
+    probs /= probs.sum()
 
-    if replay_action[5] == 1 and not car.on_ground and car.can_flip:
-        # Double jump or dodge
-        is_dodge = np.abs(replay_action[2:5]).sum() >= dodge_deadzone
-        is_dodges = np.abs(action_options[:, 2:5]).sum(axis=1) >= dodge_deadzone
-        if is_dodge:
-            # Make sure we're flipping in as close to the same direction as possible
-            dodge_dir = np.array([replay_action[2], replay_action[3] + replay_action[4]])
-            dir_error = ((action_options[:, 2] - dodge_dir[0]) ** 2
-                         + (action_options[:, 3:5].sum(axis=1) - dodge_dir[1]) ** 2)
-            masks += (dir_error == dir_error.min())
-            # And that we're exceeding deadzone
-            masks += is_dodges
-            optimal += 2
+    return probs
+
+
+def get_weighted_action_options(car: Car, replay_action: np.ndarray, action_options: np.ndarray, dodge_deadzone=0.5):
+    """
+    Produces weights for each action such that the weighted sum of the action options is as close as possible to
+    replay_action, and that the sum of the weights is 1 (e.g. they represent probabilities).
+
+    We want to combine only the two available values closest to the true value, e.g. if we can have 0.5 and 1,
+    then 0.75 would be a 50/50 mix of the two.
+
+    :param car: The car state
+    :param replay_action: The action to match
+    :param action_options: The available action options
+    :param dodge_deadzone: The deadzone for dodges
+    :return: The weights for each action option
+    """
+    # Mostly the same as get_best_action_option, but slightly more lenient with candidates,
+    # so we can get closer with the weighted average
+    margin = 0.01
+    candidates = filter_action_options(car, replay_action, action_options, False, dodge_deadzone)
+
+    button_weights = np.ones(8)
+
+    def _validate_continuous(button):
+        # Returns a boolean mask of valid candidates (e.g. between the bins in the action options)
+        replay_val = replay_action[button]
+        o = candidates[:, button]
+        diff = np.abs(o - replay_val)
+        if diff.min() <= margin:
+            v = diff <= margin
         else:
-            # Make sure we're not exceeding deadzone
-            masks += ~is_dodges
-            optimal += 1
-    elif car.on_ground:
-        # Prioritize throttle, steer and handbrake
-        if not is_boosting:
-            error = np.abs(action_options[:, 0] - replay_action[0])
-            masks += error == error.min()
-            optimal += 1
-        error = np.abs(action_options[:, 1] - replay_action[1])
-        masks += error == error.min()
-        masks += action_options[:, 7] == replay_action[7]
-        optimal += 2
-    else:
-        # Prioritize pitch, yaw and roll
-        error = np.linalg.norm(action_options[:, 2:5] - replay_action[2:5], axis=1)
-        masks += error == error.min()
-        optimal += 1
+            # Include the bin borders surrounding the replay value
+            unique = np.unique(o)
+            bins = np.digitize(o, unique)
+            diff = bins - np.digitize(replay_val, unique)
+            v = (diff == 0) | (diff == 1)
+        return v
 
-    mx = masks.max()
-    mask = masks == mx
-    is_optimal = mx == optimal
-    return mask, is_optimal
+    if car.on_ground and replay_action[5] == 0:
+        handbrake_error = np.abs(candidates[:, 7] - replay_action[7])
+        candidates = candidates[handbrake_error == handbrake_error.min()]
+
+        candidates = candidates[_validate_continuous(0)]  # Throttle
+        candidates = candidates[_validate_continuous(1)]  # Steer
+        button_weights[[2, 3, 4]] = 1e-2  # Basically telling it to only optimize this if it has options
+        button_weights[[5, 6]] = 1e-4
+    elif replay_action[5] == 0 or car.on_ground or not car.can_flip or car.is_holding_jump:
+        button_weights[[0, 1, 7]] = 1e-2
+        button_weights[[5, 6]] = 1e-4
+        candidates = candidates[_validate_continuous(2)]  # Pitch
+        candidates = candidates[_validate_continuous(3)]  # Yaw
+        candidates = candidates[_validate_continuous(4)]  # Roll
+
+        if len(candidates) > 1 and np.all(candidates[:, [2, 3, 4]] == candidates[0, [2, 3, 4]]):
+            candidates = candidates[_validate_continuous(0)]  # Throttle
+
+    if len(candidates) == 1:
+        weights = np.zeros(len(action_options))
+        idx = np.where(np.all(action_options == candidates[0], axis=1))[0]
+        weights[idx] = 1
+        return weights
+
+    # Perform least squares with sum(weights) = 1 constraint
+    scale = 1000  # Scaling factor to control the importance of the constraint
+    coefs = np.concatenate([(candidates * button_weights).T, scale * np.ones((1, len(candidates)))])
+    target = np.concatenate([(replay_action * button_weights), [scale]])
+
+    last_weights = np.zeros(len(candidates))
+    while True:
+        weights = np.linalg.lstsq(coefs, target, rcond=None)[0]
+        valid = weights >= -1e-5  # Numerical instability can cause very small negative weights
+        if valid.all() or np.allclose(weights, last_weights):
+            break
+        coefs[:, ~valid] = 0  # Set the vectors to 0, so they are effectively removed
+        last_weights = weights
+
+    weights = weights / weights.sum()  # It should be very close already but just to make sure
+    smol = (0 != weights) & (weights < 0.01)
+    while smol.any():
+        weights[smol] = 0
+        weights = weights / weights.sum()
+        smol = (0 != weights) & (weights < 0.01)
+
+    probs = np.zeros(len(action_options))
+    for i, c in enumerate(candidates):
+        idx = np.where(np.all(action_options == c, axis=1))[0]
+        probs[idx] = weights[i]
+
+    return probs
