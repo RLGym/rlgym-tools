@@ -6,12 +6,13 @@ from rlgym.rocket_league.api import PhysicsObject
 
 def relative_physics(origin: PhysicsObject, targets: List[PhysicsObject]) -> List[PhysicsObject]:
     result = []
+    rot = origin.rotation_mtx
     for target in targets:
         po = PhysicsObject()
-        po.position = (target.position - origin.position) @ origin.rotation_mtx
-        po.linear_velocity = (target.linear_velocity - origin.linear_velocity) @ origin.rotation_mtx
-        po.angular_velocity = target.angular_velocity @ origin.rotation_mtx
-        po.rotation_mtx = target.rotation_mtx @ origin.rotation_mtx.T
+        po.position = (target.position - origin.position) @ rot
+        po.linear_velocity = (target.linear_velocity - origin.linear_velocity) @ rot
+        po.angular_velocity = target.angular_velocity @ rot
+        po.rotation_mtx = target.rotation_mtx @ rot.T
         result.append(po)
     return result
 

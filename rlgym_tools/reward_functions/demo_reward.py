@@ -26,7 +26,7 @@ class DemoReward(RewardFunction[AgentID, GameState, float]):
             victim = car.bump_victim_id
             if victim is not None:
                 victim_car = state.cars[victim]
-                if victim_car.demo_respawn_timer > 0:
+                if victim_car.is_demoed:
                     rewards[agent] += self.attacker_reward
                     rewards[victim] -= self.victim_punishment
                 else:

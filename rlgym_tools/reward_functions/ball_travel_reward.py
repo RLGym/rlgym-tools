@@ -88,6 +88,8 @@ class BallTravelReward(RewardFunction[AgentID, GameState, float]):
                         rewards[agent] += norm_dist * self.intercept_weight
                         rewards[self.last_touch_agent] += norm_dist * self.giveaway_weight
                 touching_agents.append(agent)
+            elif car.is_demoed and self.last_touch_agent == agent:
+                self.last_touch_agent = None
 
         if state.goal_scored and self.last_touch_agent is not None:
             team = state.scoring_team
