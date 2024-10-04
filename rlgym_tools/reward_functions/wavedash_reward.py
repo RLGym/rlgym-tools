@@ -13,10 +13,16 @@ class WavedashReward(RewardFunction[AgentID, GameState, float]):
 
     def get_rewards(self, agents: List[AgentID], state: GameState, is_terminated: Dict[AgentID, bool],
                     is_truncated: Dict[AgentID, bool], shared_info: Dict[str, Any]) -> Dict[AgentID, float]:
-        rewards = {
-            agent: float(state.cars[agent].on_ground and self.prev_state[agent].is_flipping)
-            for agent in agents
-        }
+        rewards = {}
+        for agent in agents:
+            car = state.cars[agent]
+            prev_car = self.prev_state.cars[agent]
+            wavedash = ((car.on_ground and not prev_car.on_ground)
+                        and (car.is_flipping or prev_car.is_flipping))
+            if wavedash:
+                rewards[agent] = 1
+            else:
+                rewards[agent] = 0
         self.prev_state = state
 
         return rewards

@@ -7,9 +7,10 @@ from rlgym.rocket_league.common_values import BALL_MAX_SPEED
 
 
 class TouchReward(RewardFunction[AgentID, GameState, float]):
-    def __init__(self, touch_reward: float = 1.0, acceleration_reward: float = 0.0):
+    def __init__(self, touch_reward: float = 1.0, acceleration_reward: float = 0.0, use_touch_count: bool = True):
         self.touch_reward = touch_reward
         self.acceleration_reward = acceleration_reward
+        self.use_touch_count = use_touch_count
 
         self.prev_ball = None
 
@@ -24,8 +25,10 @@ class TouchReward(RewardFunction[AgentID, GameState, float]):
             touches = state.cars[agent].ball_touches
 
             if touches > 0:
+                if not self.use_touch_count:
+                    touches = 1
                 acceleration = np.linalg.norm(ball.linear_velocity - self.prev_ball.linear_velocity) / BALL_MAX_SPEED
-                rewards[agent] += self.touch_reward
+                rewards[agent] += self.touch_reward * touches
                 rewards[agent] += acceleration * self.acceleration_reward
 
         self.prev_ball = ball

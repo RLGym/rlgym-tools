@@ -64,7 +64,7 @@ def trajectory_comparison(pos1, vel1, pos2, vel2, check_bounds=True):
         for pos, vel in (pos1, vel1), (pos2, vel2):
             bounds = np.array([[-SIDE_WALL_X, -BACK_WALL_Y, 0],
                                [SIDE_WALL_X, BACK_WALL_Y, CEILING_Z]])
-            times = (bounds - pos) / vel
+            times = (bounds - pos) / (vel + (vel == 0))
             times = times[times > 0]
             t = np.min(times)
             max_time = min(max_time, t)

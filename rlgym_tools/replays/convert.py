@@ -2,7 +2,7 @@ import time
 import warnings
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Literal, Dict, Optional
+from typing import Literal, Dict, Optional, Callable
 
 import numpy as np
 from rlgym.rocket_league.api import GameState, Car
@@ -42,7 +42,8 @@ class ReplayFrame:
 
 
 def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"] = "rocketsim",
-                    predict_pyr=True, calculate_error=False, action_options=None):
+                    predict_pyr=True, calculate_error=False, action_options=None,
+                    step_rounding: Callable[[float], int] = round):
     if interpolation not in ("none", "linear", "rocketsim"):
         raise ValueError(f"Interpolation mode {interpolation} not recognized")
     rocketsim_interpolation = interpolation == "rocketsim"
@@ -53,6 +54,12 @@ def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"
     count_orange = sum(p["is_orange"] is True for p in players.values())
     base_mutator = FixedTeamSizeMutator(blue_size=len(players) - count_orange, orange_size=count_orange)
     kickoff_mutator = KickoffMutator()
+
+    hits = set()
+    for hit in replay.analyzer.get("hits", []):
+        f = hit["frame_number"]
+        p = hit["player_unique_id"]
+        hits.add((f, int(p)))
 
     average_tick_rate = replay.game_df["delta"].mean() * TICKS_PER_SECOND
 
@@ -166,10 +173,11 @@ def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"
             update_age = {}
             for uid, player_row in zip(player_ids, car_rows):
                 car = state.cars[uid]
+                hit = (frame, uid) in hits
                 if calculate_error:  # and i > 0 and not player_rows[player_ids.index(uid)][i - 1].is_repeat:
                     action, error_pos, error_quat, error_vel, error_ang_vel \
                         = _update_car_and_get_action(car, linear_interpolation, player_row, state,
-                                                     calculate_error=True, i=i)
+                                                     calculate_error=True, hit=hit)
 
                     if frame != start_frame and not np.isnan(error_pos):
                         total_pos_error.setdefault(uid, []).append(error_pos)
@@ -208,7 +216,7 @@ def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"
                     # action = action_options[np.random.choice(len(action_options), p=probs)]
                     print()
                 else:
-                    action = _update_car_and_get_action(car, linear_interpolation, player_row, state, i=i)
+                    action = _update_car_and_get_action(car, linear_interpolation, player_row, state, hit=hit)
 
                 actions[uid] = action
                 update_age[uid] = player_row.update_age if not player_row.is_demoed else 0
@@ -249,7 +257,7 @@ def replay_to_rlgym(replay, interpolation: Literal["none", "linear", "rocketsim"
             if frame == end_frame:
                 break
 
-            ticks = round(game_tuples[i + 1].time * TICKS_PER_SECOND - state.tick_count)
+            ticks = step_rounding(game_tuples[i + 1].time * TICKS_PER_SECOND - state.tick_count)
             for uid, action in actions.items():
                 actions[uid] = action.reshape(1, -1).repeat(ticks, axis=0)
 
@@ -364,7 +372,7 @@ def _prepare_segment_dfs(replay, start_frame, end_frame, linear_interpolation, p
 
 
 def _update_car_and_get_action(car: Car, linear_interpolation: bool, player_row, state: GameState,
-                               calculate_error=False, i=0):
+                               calculate_error=False, hit: bool = False):
     error_pos = error_quat = error_vel = error_ang_vel = np.nan
     if linear_interpolation or not player_row.is_repeat:
         true_pos = (player_row.pos_x, player_row.pos_y, player_row.pos_z)
@@ -459,6 +467,8 @@ def _update_car_and_get_action(car: Car, linear_interpolation: bool, player_row,
         # I think this is autoflip?
         car.on_ground = False
         jump = 1
+    if hit and car.ball_touches == 0:
+        car.ball_touches = 1
     boost = player_row.boost_is_active
     handbrake = player_row.handbrake
     action = np.array([throttle, steer, pitch, yaw, roll, jump, boost, handbrake],

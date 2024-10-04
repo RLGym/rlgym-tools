@@ -9,7 +9,7 @@ from rlgym_tools.math.solid_angle import view_goal_ratio
 
 
 class GoalProbReward(RewardFunction[AgentID, GameState, float]):
-    def __init__(self, gamma=1):
+    def __init__(self, gamma: float = 1):
         """
         According to Ng. et al. (1999), a reward shaping function must be of the form:
         F(s, a, s') = γ * Φ(s') - Φ(s)
@@ -64,6 +64,7 @@ class GoalViewReward(GoalProbReward):
     Basically it says "if we cast a ray from the ball in random directions until it hits a goal,
     what's the chance it hits the orange goal (blue scoring)?"
     """
+
     def calculate_blue_goal_prob(self, state: GameState):
         ball_pos = state.ball.position
         view_blue = view_goal_ratio(ball_pos, -GOAL_THRESHOLD)  # Blue net aka orange scoring

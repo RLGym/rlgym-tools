@@ -59,7 +59,7 @@ def aerial_inputs(ang_vel_start, ang_vel_end, rot_mat_start, rot_mat_end, dt, is
             tst[2, 0] * ang_vel_end[0] + tst[2, 1] * ang_vel_end[1] + tst[2, 2] * ang_vel_end[2]
         ])
 
-        if abs(ang_vel_local_start[1]) > abs(ang_vel_local_end[1]) * scale:
+        if abs(ang_vel_local_start[1]) > abs(ang_vel_local_end[1]):
             # Flip cancel
             u[1] = np.sign(ang_vel_local_start[1])
 

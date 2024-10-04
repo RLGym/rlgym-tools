@@ -10,16 +10,18 @@ class BallTravelReward(RewardFunction[AgentID, GameState, float]):
     def __init__(self, consecutive_weight=1.0,
                  pass_weight=1.0, receive_weight=1.0,
                  giveaway_weight=-1.0, intercept_weight=1.0,
+                 goal_weight=1.0,
                  distance_normalization=None,
                  do_integral=False):
         """
         Reward function based on the distance the ball travels between touches.
 
-        :param consecutive_weight: Reward for consecutive touches by the same player.
-        :param pass_weight: Reward for receiving a pass.
-        :param receive_weight: Reward for passing the ball.
-        :param giveaway_weight: Reward for giving the ball away to the other team.
-        :param intercept_weight: Reward for intercepting the ball.
+        :param consecutive_weight: Weight for distance covered between consecutive touches by the same player.
+        :param pass_weight: Weight for distance covered by a pass to a teammate.
+        :param receive_weight: Weight for distance covered by a pass received from a teammate.
+        :param giveaway_weight: Weight for distance covered by a pass (giveaway) to an opponent.
+        :param intercept_weight: Weight for distance covered by a pass intercepted from an opponent.
+        :param goal_weight: Weight for distance covered between a touch and a goal.
         :param distance_normalization: Factor to normalize distance travelled between touches.
                                        Defaults to weighting a distance of the full length of the field as 1.0
         :param do_integral: Whether to calculate the area under the ball's travel curve instead of the distance.
@@ -29,6 +31,7 @@ class BallTravelReward(RewardFunction[AgentID, GameState, float]):
         self.receive_weight = receive_weight
         self.giveaway_weight = giveaway_weight
         self.intercept_weight = intercept_weight
+        self.goal_weight = goal_weight
 
         if distance_normalization is None:
             if do_integral:
@@ -49,7 +52,7 @@ class BallTravelReward(RewardFunction[AgentID, GameState, float]):
         self.last_touch_agent = None
         self.distance_since_touch = 0
 
-    def get_rewards(self, agents: List[AgentID], state: StateType, is_terminated: Dict[AgentID, bool],
+    def get_rewards(self, agents: List[AgentID], state: GameState, is_terminated: Dict[AgentID, bool],
                     is_truncated: Dict[AgentID, bool], shared_info: Dict[str, Any]) -> Dict[AgentID, RewardType]:
         ball_pos = state.ball.position
 
@@ -71,21 +74,29 @@ class BallTravelReward(RewardFunction[AgentID, GameState, float]):
         for agent in agents:
             car = state.cars[agent]
             if car.ball_touches > 0:
-                norm_dist = self.distance_since_touch * self.normalization_factor
-                if agent == self.last_touch_agent:
-                    # Consecutive touches
-                    rewards[agent] += norm_dist * self.consecutive_weight
-                elif car.team_num == state.cars[self.last_touch_agent].team_num:
-                    # Pass to teammate
-                    rewards[agent] += norm_dist * self.receive_weight
-                    rewards[self.last_touch_agent] += norm_dist * self.pass_weight
-                else:
-                    # Team change
-                    rewards[agent] += norm_dist * self.intercept_weight
-                    rewards[self.last_touch_agent] += norm_dist * self.giveaway_weight
+                if self.last_touch_agent is not None:
+                    norm_dist = self.distance_since_touch * self.normalization_factor
+                    if agent == self.last_touch_agent:
+                        # Consecutive touches
+                        rewards[agent] += norm_dist * self.consecutive_weight
+                    elif car.team_num == state.cars[self.last_touch_agent].team_num:
+                        # Pass to teammate
+                        rewards[agent] += norm_dist * self.receive_weight
+                        rewards[self.last_touch_agent] += norm_dist * self.pass_weight
+                    else:
+                        # Team change
+                        rewards[agent] += norm_dist * self.intercept_weight
+                        rewards[self.last_touch_agent] += norm_dist * self.giveaway_weight
                 touching_agents.append(agent)
 
+        if state.goal_scored and self.last_touch_agent is not None:
+            team = state.scoring_team
+            norm_dist = self.distance_since_touch * self.normalization_factor
+            mul = 1 if team == state.cars[self.last_touch_agent].team_num else -1
+            rewards[self.last_touch_agent] += mul * norm_dist * self.goal_weight
+
         if len(touching_agents) > 0:
+            self.distance_since_touch = 0
             # Update the last touch agent
             if len(touching_agents) == 1:
                 self.last_touch_agent = touching_agents[0]
@@ -97,9 +108,8 @@ class BallTravelReward(RewardFunction[AgentID, GameState, float]):
                 closest_agent = min(touching_agents,
                                     key=lambda x: np.linalg.norm(state.cars[x].physics.position - ball_pos))
                 self.last_touch_agent = closest_agent
-                self.distance_since_touch = 0
 
-                shared_info["last_touch_agent"] = self.last_touch_agent
-                shared_info["distance_since_touch"] = self.distance_since_touch
+        shared_info["last_touch_agent"] = self.last_touch_agent
+        shared_info["distance_since_touch"] = self.distance_since_touch
 
         return rewards

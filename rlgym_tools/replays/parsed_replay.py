@@ -52,6 +52,9 @@ class ParsedReplay:
 
     @staticmethod
     def load(replay_dir, carball_path=None) -> "ParsedReplay":
+        if not os.path.exists(replay_dir):
+            raise FileNotFoundError(f"Replay directory {replay_dir} does not exist")
+
         if isinstance(replay_dir, str):
             replay_dir = Path(replay_dir)
 
