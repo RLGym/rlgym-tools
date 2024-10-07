@@ -17,12 +17,12 @@ class TeamSpiritRewardWrapper(RewardFunction[AgentID, GameState, float]):
 
     def get_rewards(self, agents: List[AgentID], state: GameState, is_terminated: Dict[AgentID, bool],
                     is_truncated: Dict[AgentID, bool], shared_info: Dict[str, Any]) -> Dict[AgentID, float]:
-        base_rewards = self.reward_fn.get_rewards(agents, state, is_terminated, is_truncated, shared_info)
+        base_rewards = self.reward_fn.get_rewards(list(state.cars.keys()), state, is_terminated, is_truncated, shared_info)
 
         # We calculate the means first
         total_blue = total_orange = n_blue = n_orange = 0
-        for agent in agents:
-            if state.cars[agent].is_blue:
+        for agent, car in state.cars.items():
+            if car.is_blue:
                 total_blue += base_rewards[agent]
                 n_blue += 1
             else:

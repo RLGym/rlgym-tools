@@ -8,11 +8,6 @@ from rlgym.rocket_league.common_values import TICKS_PER_SECOND, GRAVITY, BLUE_TE
 
 from rlgym_tools.math.ball import ball_hit_ground
 
-PRE_MATCH = 0
-REGULATION = 1
-OVERTIME = 2
-POST_MATCH = 3
-
 
 @dataclass(slots=True)
 class ScoreboardInfo:
@@ -41,6 +36,7 @@ class ScoreboardProvider(SharedInfoProvider[AgentID, GameState]):
     - The time remaining until kickoff buffer ends
     - Whether the game should go to kickoff
     - Whether the game is over
+    Your state setter is responsible for initializing the scoreboard with the desired values.
     """
 
     def __init__(self):

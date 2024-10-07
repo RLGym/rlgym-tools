@@ -34,8 +34,10 @@ class WavedashReward(RewardFunction[AgentID, GameState, float]):
                     acc = self.prev_acceleration[agent]
                     rewards[agent] = acc / CAR_MAX_SPEED
                     self.prev_acceleration[agent] = 0
-                elif not car.is_flipping:
-                    self.prev_acceleration[agent] = 0
+                else:
+                    rewards[agent] = 0
+                    if not car.is_flipping:
+                        self.prev_acceleration[agent] = 0
             else:
                 if wavedash:
                     rewards[agent] = 1

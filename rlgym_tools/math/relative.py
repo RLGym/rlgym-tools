@@ -17,15 +17,19 @@ def relative_physics(origin: PhysicsObject, targets: List[PhysicsObject]) -> Lis
     return result
 
 
-def dodge_relative_physics(origin: PhysicsObject, targets: List[PhysicsObject]) -> List[PhysicsObject]:
-    # Dodges only happen in the xy plane, so we pretend the car's hood is facing straight up
-    modified_rot = np.zeros_like(origin.rotation_mtx)
-    fw = origin.forward[:2]
+def dodge_relative_rot_mtx(rot_mtx: np.ndarray) -> np.ndarray:
+    modified_rot = np.zeros_like(rot_mtx)
+    fw = rot_mtx[:2, 0]
     modified_rot[:2, 0] = fw / np.linalg.norm(fw)  # Renormalize forward
     modified_rot[0, 1] = -modified_rot[1, 0]  # Recalculate right vector
     modified_rot[1, 1] = modified_rot[0, 0]  # --||--
     modified_rot[2, 2] = 1  # Set z axis to be up
+    return modified_rot
 
+
+def dodge_relative_physics(origin: PhysicsObject, targets: List[PhysicsObject]) -> List[PhysicsObject]:
+    # Dodges only happen in the xy plane, so we pretend the car's hood is facing straight up
+    modified_rot = dodge_relative_rot_mtx(origin.rotation_mtx)
     result = []
     for target in targets:
         po = PhysicsObject()

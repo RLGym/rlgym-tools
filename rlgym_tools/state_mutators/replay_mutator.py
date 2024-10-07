@@ -36,6 +36,7 @@ class ReplayMutator(StateMutator[GameState]):
         state.boost_pad_timers = new_state.boost_pad_timers
 
         shared_info["replay_frame"] = replay_frame
+        shared_info["scoreboard"] = replay_frame.scoreboard
 
     @staticmethod
     def make_files(replay_files: List[str],
