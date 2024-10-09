@@ -11,6 +11,8 @@ from rlgym.rocket_league.reward_functions import GoalReward
 from rlgym.rocket_league.sim import RocketSimEngine
 from rlgym.rocket_league.state_mutators import KickoffMutator, FixedTeamSizeMutator, MutatorSequence
 
+from rlgym_tools.shared_info_providers.scoreboard_provider import ScoreboardInfo
+
 
 # Utilities to serialize and deserialize RLGym Rocket League objects into numpy arrays
 # This can be useful for saving and loading states, sending over network, or batch operations.
@@ -25,6 +27,8 @@ def serialize(obj):
         return serialize_car(obj)
     elif isinstance(obj, PhysicsObject):
         return serialize_physics_object(obj)
+    elif isinstance(obj, ScoreboardInfo):
+        return serialize_scoreboard(obj)
     else:
         raise ValueError(f"Unsupported type: {type(obj)}")
 
@@ -37,6 +41,8 @@ def deserialize(obj):
             return deserialize_car(obj)
         elif obj.shape == (3,):
             return deserialize_config(obj)
+        elif obj.shape == (6,):
+            return deserialize_scoreboard(obj)
         else:
             return deserialize_game_state(obj)
     else:
@@ -241,6 +247,38 @@ def deserialize_physics_object(data: np.ndarray[tuple[Literal[18]], np.dtype[np.
     po.rotation_mtx = data[PO_ROTATION_MTX].reshape(3, 3)
 
     return po
+
+
+def serialize_scoreboard(scoreboard: ScoreboardInfo):
+    return np.array([
+        scoreboard.game_timer_seconds,
+        scoreboard.kickoff_timer_seconds,
+        scoreboard.blue_score,
+        scoreboard.orange_score,
+        int(scoreboard.go_to_kickoff),
+        int(scoreboard.is_over),
+    ], dtype=np.float32)
+
+
+# Indices for serialized ScoreboardInfo:
+SB_GAME_TIMER_SECONDS = 0
+SB_KICKOFF_TIMER_SECONDS = 1
+SB_BLUE_SCORE = 2
+SB_ORANGE_SCORE = 3
+SB_GO_TO_KICKOFF = 4
+SB_IS_OVER = 5
+
+
+def deserialize_scoreboard(data: np.ndarray):
+    assert data.shape == (6,)
+    return ScoreboardInfo(
+        game_timer_seconds=float(data[SB_GAME_TIMER_SECONDS]),
+        kickoff_timer_seconds=float(data[SB_KICKOFF_TIMER_SECONDS]),
+        blue_score=int(data[SB_BLUE_SCORE]),
+        orange_score=int(data[SB_ORANGE_SCORE]),
+        go_to_kickoff=bool(data[SB_GO_TO_KICKOFF]),
+        is_over=bool(data[SB_IS_OVER]),
+    )
 
 
 def main():
