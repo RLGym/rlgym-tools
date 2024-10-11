@@ -18,7 +18,7 @@ def solve_parabolic_trajectory(ball: PhysicsObject, g=GRAVITY):
     a = -0.5 * g
     b = vz
     c = z
-    discriminant = b ** 2 - 4 * a * c
+    discriminant = b * b - 4 * a * c
     if discriminant < 0:
         return None, None
     discriminant = math.sqrt(discriminant)

@@ -11,6 +11,7 @@ from rlgym.rocket_league.reward_functions import GoalReward
 from rlgym.rocket_league.sim import RocketSimEngine
 from rlgym.rocket_league.state_mutators import KickoffMutator, FixedTeamSizeMutator, MutatorSequence
 
+from rlgym_tools.replays.replay_frame import ReplayFrame
 from rlgym_tools.shared_info_providers.scoreboard_provider import ScoreboardInfo
 
 
@@ -58,7 +59,7 @@ def serialize_game_state(game_state: GameState) -> np.ndarray:
         game_state.boost_pad_timers,
         *[np.array([agent_id, *serialize_car(car)])
           for agent_id, car in game_state.cars.items()]
-    ])
+    ], dtype=np.float32)
 
 
 # Indices for serialized GameState:
@@ -68,10 +69,11 @@ GS_CONFIG = slice(2, 5)
 GS_BALL = slice(5, 23)
 GS_BOOST_PAD_TIMERS = slice(23, 23 + len(BOOST_LOCATIONS))
 GS_CARS = slice(23 + len(BOOST_LOCATIONS), None)
+GS_CAR_LENGTH = 43
 
 
 def deserialize_game_state(data: np.ndarray) -> GameState:
-    assert (len(data) - GS_CARS.start) % 43 == 0, f"Invalid data length: {len(data)}"
+    assert (len(data) - GS_CARS.start) % GS_CAR_LENGTH == 0, f"Invalid data length: {len(data)}"
     game_state = GameState()
     game_state.tick_count = int(data[GS_TICK_COUNT])
     game_state.goal_scored = bool(data[GS_GOAL_SCORED])
@@ -86,9 +88,11 @@ def deserialize_game_state(data: np.ndarray) -> GameState:
 
     rest = data[GS_CARS]
     cars = {}
-    for i in range(0, len(rest), 43):
+    for i in range(0, len(rest), GS_CAR_LENGTH):
+        if np.all(rest[i:i + GS_CAR_LENGTH] == 0):  # Padding
+            break
         agent_id = int(rest[i])
-        car = deserialize_car(rest[i + 1:i + 43])
+        car = deserialize_car(rest[i + 1:i + GS_CAR_LENGTH])
         cars[agent_id] = car
     game_state.cars = cars
 
@@ -281,6 +285,67 @@ def deserialize_scoreboard(data: np.ndarray):
     )
 
 
+def serialize_replay_frame(replay_frame: ReplayFrame):
+    # state: GameState
+    # actions: Dict[int, np.ndarray]
+    # update_age: Dict[int, float]
+    # scoreboard: ScoreboardInfo
+    # episode_seconds_remaining: float
+    # next_scoring_team: Optional[int]
+    # winning_team: Optional[int]
+    num_players = len(replay_frame.state.cars)
+    agent_ids = list(replay_frame.state.cars.keys())
+    update_ages = np.array([replay_frame.update_age[agent_id] for agent_id in agent_ids], dtype=np.float32)
+    actions = np.concatenate([replay_frame.actions[agent_id] for agent_id in agent_ids], dtype=np.float32)
+    return np.concatenate([
+        serialize_scoreboard(replay_frame.scoreboard),
+        np.array([replay_frame.episode_seconds_remaining,
+                  replay_frame.next_scoring_team if replay_frame.next_scoring_team is not None else -1,
+                  replay_frame.winning_team if replay_frame.winning_team is not None else -1]),
+        [num_players],
+        np.array(agent_ids),
+        update_ages,
+        actions,
+        serialize_game_state(replay_frame.state),
+    ], dtype=np.float32)
+
+
+# Indices for serialized ReplayFrame:
+RF_SCOREBOARD = slice(0, 6)
+RF_EPISODE_SECONDS_REMAINING = 6
+RF_NEXT_SCORING_TEAM = 7
+RF_WINNING_TEAM = 8
+RF_NUM_PLAYERS = 9
+RF_AGENT_IDS_START = 10
+RF_ACTION_SIZE = 8
+
+
+def deserialize_replay_frame(data: np.ndarray):
+    scoreboard = deserialize_scoreboard(data[RF_SCOREBOARD])
+    episode_seconds_remaining = float(data[RF_EPISODE_SECONDS_REMAINING])
+    next_scoring_team = int(data[RF_NEXT_SCORING_TEAM]) if data[RF_NEXT_SCORING_TEAM] != -1 else None
+    winning_team = int(data[RF_WINNING_TEAM]) if data[RF_WINNING_TEAM] != -1 else None
+    num_players = int(data[RF_NUM_PLAYERS])
+    k = RF_AGENT_IDS_START
+    agent_ids = data[k:k + num_players]
+    k += num_players
+    update_ages = data[k:k + num_players]
+    k += num_players
+    actions = data[k:k + num_players * RF_ACTION_SIZE].reshape(num_players, RF_ACTION_SIZE)
+    k += num_players * RF_ACTION_SIZE
+    state = deserialize_game_state(data[k:])
+
+    return ReplayFrame(
+        state=state,
+        actions={agent_id: action for agent_id, action in zip(agent_ids, actions)},
+        update_age={agent_id: update_age for agent_id, update_age in zip(agent_ids, update_ages)},
+        scoreboard=scoreboard,
+        episode_seconds_remaining=episode_seconds_remaining,
+        next_scoring_team=next_scoring_team,
+        winning_team=winning_team,
+    )
+
+
 def main():
     class RenameAgentMutator(StateMutator):
         def apply(self, state: StateType, shared_info: Dict[str, Any]) -> None:
@@ -298,10 +363,12 @@ def main():
 
     obs = env.reset()
     states = []
+    serialized_states = []
     while True:
         state = transition_engine.state
+        states.append(state)
         s = serialize(state)
-        states.append(s)
+        serialized_states.append(s)
         d = deserialize(s)
 
         assert d.tick_count == state.tick_count

@@ -3,8 +3,8 @@ from dataclasses import dataclass, asdict, replace
 from typing import List, Dict, Any
 
 from rlgym.api import SharedInfoProvider, AgentID
-from rlgym.rocket_league.api import GameState, PhysicsObject
-from rlgym.rocket_league.common_values import TICKS_PER_SECOND, GRAVITY, BLUE_TEAM
+from rlgym.rocket_league.api import GameState
+from rlgym.rocket_league.common_values import TICKS_PER_SECOND, BLUE_TEAM
 
 from rlgym_tools.math.ball import ball_hit_ground
 
