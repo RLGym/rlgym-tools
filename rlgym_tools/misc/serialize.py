@@ -328,6 +328,7 @@ def deserialize_replay_frame(data: np.ndarray):
     num_players = int(data[RF_NUM_PLAYERS])
     k = RF_AGENT_IDS_START
     agent_ids = data[k:k + num_players]
+    agent_ids = [int(agent_id) for agent_id in agent_ids]
     k += num_players
     update_ages = data[k:k + num_players]
     k += num_players
