@@ -97,7 +97,7 @@ def get_best_action_options(car: Car, replay_action: np.ndarray, action_options:
         naive_error = np.linalg.norm(candidates - replay_action, axis=1)
         candidates = candidates[naive_error == naive_error.min()]
 
-    probs = np.zeros(len(action_options), dtype=float)
+    probs = np.zeros(len(action_options), dtype=np.float32)
     for i, c in enumerate(candidates):
         probs[np.all(action_options == c, axis=1)] = 1
     probs /= probs.sum()
@@ -186,7 +186,7 @@ def get_weighted_action_options(car: Car, replay_action: np.ndarray, action_opti
         weights = weights / weights.sum()
         smol = (0 != weights) & (weights < 0.01)
 
-    probs = np.zeros(len(action_options))
+    probs = np.zeros(len(action_options), dtype=np.float32)
     for i, c in enumerate(candidates):
         idx = np.where(np.all(action_options == c, axis=1))[0]
         probs[idx] = weights[i]

@@ -57,14 +57,12 @@ class BallTravelReward(RewardFunction[AgentID, GameState, float]):
         ball_pos = state.ball.position
 
         # Update the distance travelled by the ball
+        distance = np.linalg.norm(ball_pos - self.prev_ball_pos)
         if self.do_integral:
             # The path of the ball defines a right trapezoid (to a close approximation).
-            xy_distance = np.linalg.norm(ball_pos[:2] - self.prev_ball_pos[:2])
             z_height = (ball_pos[2] + self.prev_ball_pos[2]) / 2
-            area = xy_distance * z_height
+            area = distance * z_height
             distance = area
-        else:
-            distance = np.linalg.norm(ball_pos - self.prev_ball_pos)
         self.prev_ball_pos = ball_pos
         self.distance_since_touch += distance
 
