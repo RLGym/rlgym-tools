@@ -7,47 +7,40 @@ from rlgym.api import StateMutator
 from rlgym.rocket_league.api import GameState
 
 from rlgym_tools.misc.serialize import serialize_game_state, deserialize_game_state, deserialize_scoreboard, \
-    serialize_scoreboard, GS_CARS, GS_CAR_LENGTH
+    serialize_scoreboard, GS_CARS, GS_CAR_LENGTH, RF_AGENT_IDS_START, serialize_replay_frame, deserialize_replay_frame
 from rlgym_tools.replays.convert import replay_to_rlgym
 from rlgym_tools.replays.parsed_replay import ParsedReplay
+from rlgym_tools.replays.replay_frame import ReplayFrame
 
 
 class ReplayMutator(StateMutator[GameState]):
     def __init__(
             self,
-            path_or_arrays: Union[str, dict[str, np.ndarray]],
+            replay_frames: Union[str, np.ndarray],
+            probabilities: Optional[str, np.ndarray] = None,
     ):
         """
         A state mutator that randomly selects a state from a replay file and applies it to the current state.
 
-        :param path_or_arrays: Path to npz file or directory containing replay data, or a dictionary containing the
-                               arrays directly.
+        :param replay_frames: The replay file to sample states from. Can be a .npz file, a .dat file, or a numpy array.
+        :param probabilities: The probabilities of selecting each state in the replay file. Defaults to uniform.
         """
 
-        scoreboards = None
-        probabilities = None
-
-        if isinstance(path_or_arrays, dict):
-            arrays = path_or_arrays
-            states = arrays["states"]
-            scoreboards = arrays.get("scoreboards")
-            probabilities = arrays.get("probabilities")
-        else:
-            path = path_or_arrays
-            if os.path.isdir(path):
-                states = np.memmap(os.path.join(path, "states.dat"), dtype='float32', mode='r')
-                if os.path.isfile((fpath := os.path.join(path, "scoreboards.dat"))):
-                    scoreboards = np.memmap(fpath, dtype='float32', mode='r')
-                if os.path.isfile((fpath := os.path.join(path, "probabilities.npy"))):
-                    probabilities = np.load(fpath)
+        if isinstance(replay_frames, str):
+            if replay_frames.endswith(".npz"):
+                with np.load(replay_frames) as data:
+                    replay_frames = data["replay_frames"]
+                    if probabilities is None:
+                        probabilities = data.get("probabilities")
+            elif replay_frames.endswith(".dat"):
+                replay_frames = np.memmap(replay_frames, dtype='float32', mode='r')
             else:
-                with np.load(path) as data:
-                    states = data["states"]
-                    scoreboards = data.get("scoreboards")
-                    probabilities = data.get("probabilities")
+                raise ValueError("Invalid replay file")
 
-        self.states = states
-        self.scoreboards = scoreboards
+        if isinstance(probabilities, str):
+            probabilities = np.load(probabilities)  # Assume .npy file
+
+        self.replay_frames = replay_frames
         self.probabilities = self.assign_probabilities() if probabilities is None else probabilities
 
     def assign_probabilities(self):
@@ -57,12 +50,15 @@ class ReplayMutator(StateMutator[GameState]):
 
         :return: A list of probabilities for each state.
         """
-        probs = np.full(shape=len(self.states), fill_value=1 / len(self.states), dtype=np.float32)
-        return probs
+        return None  # Uniform distribution
+
+    def __getitem__(self, item) -> ReplayFrame:
+        return deserialize_replay_frame(self.replay_frames[item])
 
     def apply(self, state: GameState, shared_info: Dict[str, Any]) -> None:
-        idx = np.random.choice(len(self.states), p=self.probabilities)
-        new_state = deserialize_game_state(self.states[idx])
+        idx = np.random.choice(len(self.replay_frames), p=self.probabilities)
+        replay_frame = self[idx]
+        new_state = replay_frame.state
         state.tick_count = new_state.tick_count
         state.goal_scored = new_state.goal_scored
         state.config = new_state.config
@@ -70,8 +66,8 @@ class ReplayMutator(StateMutator[GameState]):
         state.ball = new_state.ball
         state.boost_pad_timers = new_state.boost_pad_timers
 
-        if self.scoreboards is not None:
-            shared_info["scoreboard"] = deserialize_scoreboard(self.scoreboards[idx])
+        shared_info["replay_frame"] = replay_frame  # In case anyone needs more than state and scoreboard
+        shared_info["scoreboard"] = replay_frame.scoreboard
 
     @staticmethod
     def make_file(replay_files: List[str],
@@ -81,21 +77,18 @@ class ReplayMutator(StateMutator[GameState]):
                   interpolation: Literal["none", "linear", "rocketsim"] = "rocketsim",
                   carball_path=None,
                   max_num_players=6) -> Tuple[np.ndarray, np.ndarray]:
-        size = len(replay_files) * 5 * 60 * 30 // frame_skip  # Approximate size of replay files
+        size = len(replay_files) * 5 * 60 * 30 // frame_skip  # Initial guess of frame count
 
-        states_shape = (size, GS_CARS.start + max_num_players * GS_CAR_LENGTH)
+        max_state_size = GS_CARS.start + max_num_players * GS_CAR_LENGTH
+        max_replay_frame_size = (RF_AGENT_IDS_START
+                                 + 3 * max_num_players  # agent_id, update_age, actions
+                                 + max_state_size)
 
         if do_memory_map:
-            assert os.path.isdir(output_path), "Output path must be a directory"
-            states = np.memmap(os.path.join(output_path, "states.dat"),
-                               dtype='float32', mode='w+', shape=states_shape)
-            scoreboards = np.memmap(os.path.join(output_path, "scoreboards.dat"),
-                                    dtype='float32', mode='w+', shape=(size, 6))
+            replay_frames = np.memmap(os.path.join(output_path, "replay_frames.dat"),
+                                      dtype='float32', mode='w+', shape=(size, max_replay_frame_size))
         else:
-            states = np.zeros(states_shape, dtype=np.float32)
-            scoreboards = np.zeros((size, 6), dtype=np.float32)
-
-        most_cars = 0
+            replay_frames = np.zeros((size, max_replay_frame_size), dtype=np.float32)
 
         i = 0
         for k, replay_file in enumerate(replay_files):
@@ -103,29 +96,22 @@ class ReplayMutator(StateMutator[GameState]):
             frame = random.randrange(0, frame_skip)  # Randomize starting frame to increase diversity
             for replay_frame in replay_to_rlgym(parsed_replay, interpolation, predict_pyr=True, calculate_error=False):
                 if frame % frame_skip == 0:
-                    serialized_state = serialize_game_state(replay_frame.state)
-                    serialized_scoreboard = serialize_scoreboard(replay_frame.scoreboard)
+                    serialized_frame = serialize_replay_frame(replay_frame)
 
                     if i >= size:
                         # Make a new estimate of the size of the replay files and expand the arrays
                         frames_per_replay = (i + 1) / (k or 1)
                         new_size = (len(replay_files) + 1) * frames_per_replay  # +1 so we don't have to resize a lot
-                        states.resize((new_size, states.shape[1]))
-                        scoreboards.resize((new_size, 6))
+                        replay_frames.resize((new_size, max_replay_frame_size))
 
-                    if len(replay_frame.state.cars) > most_cars:
-                        most_cars = len(replay_frame.state.cars)
-
-                    states[i] = serialized_state
-                    scoreboards[i] = serialized_scoreboard
+                    replay_frames[i, :len(serialized_frame)] = serialized_frame
 
                     i += 1
                 frame += 1
 
-        states.resize((i, states.shape[1]))
-        scoreboards.resize((i, 6))
+        replay_frames.resize((i, max_replay_frame_size))
 
         if not do_memory_map:
-            np.savez_compressed(output_path, states=states, scoreboards=scoreboards)
+            np.savez_compressed(output_path, replay_frames=replay_frames)
 
-        return states, scoreboards
+        return replay_frames
