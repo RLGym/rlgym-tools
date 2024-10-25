@@ -17,7 +17,7 @@ class ReplayMutator(StateMutator[GameState]):
     def __init__(
             self,
             replay_frames: Union[str, np.ndarray],
-            probabilities: Optional[str, np.ndarray] = None,
+            probabilities: Union[None, str, np.ndarray] = None,
     ):
         """
         A state mutator that randomly selects a state from a replay file and applies it to the current state.
