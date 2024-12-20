@@ -57,7 +57,8 @@ class AdvancedLookupTableAction(LookupTableAction):
                  flip_bins: Any = 8,
                  include_stall: bool = False):
         super().__init__()
-        self._lookup_table = self.make_lookup_table(throttle_bins, steer_bins, torque_subdivisions, flip_bins, include_stall)
+        self._lookup_table = self.make_lookup_table(throttle_bins, steer_bins, torque_subdivisions, flip_bins,
+                                                    include_stall)
 
     @staticmethod
     def make_lookup_table(throttle_bins: Any = 3,
@@ -143,14 +144,3 @@ class AdvancedLookupTableAction(LookupTableAction):
         assert len(np.unique(actions, axis=0)) == len(actions), 'Duplicate actions found'
 
         return actions
-
-
-if __name__ == '__main__':
-    lut = AdvancedLookupTableAction.make_lookup_table(torque_subdivisions=2)
-    print(lut.shape)
-    lut = AdvancedLookupTableAction.make_lookup_table(torque_subdivisions=3)
-    # lut = AdvancedLookupTableAction.make_lookup_table(throttle_bins=(-1, 0, 0.5, 1), steer_bins=5, torque_subdivisions=3, flip_bins=16)
-    print(lut.shape)
-    lut = AdvancedLookupTableAction.make_lookup_table(torque_subdivisions=4)
-    # lut = AdvancedLookupTableAction.make_lookup_table(throttle_bins=(-1, 0, 0.5, 1), steer_bins=5, torque_subdivisions=4, flip_bins=16)
-    print(lut.shape)
