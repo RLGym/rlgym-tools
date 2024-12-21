@@ -1,12 +1,16 @@
 import math
 
-from rlgym.rocket_league.common_values import BACK_WALL_Y, SIDE_WALL_X, GOAL_HEIGHT
-from scipy.stats.distributions import skellam, expon, truncexpon
 import numpy as np
+from rlgym.rocket_league.common_values import BACK_WALL_Y, SIDE_WALL_X, GOAL_HEIGHT
+
+try:
+    from scipy.stats.distributions import skellam
+except ImportError:
+    skellam = None  # Lets us import the constants without scipy. It'll fail if you try to use the function.
 
 # Win probability estimation using Skellam distribution
 
-AVERAGE_EPISODE_LENGTH = np.array([26.32, 47.16, 68.52])
+AVERAGE_EPISODE_LENGTH = np.array([26.32, 47.16, 68.52])  # In seconds
 GOALS_PER_MINUTE = 60 / AVERAGE_EPISODE_LENGTH
 
 FLOOR_AREA = 4 * BACK_WALL_Y * SIDE_WALL_X - 1152 * 1152  # Subtract corners
@@ -17,6 +21,8 @@ SECONDS_PER_MINUTE = 60
 
 def win_prob(goals_per_minute: float, time_left_seconds: float, differential: int,
              next_goal_prob: float = 0.5, hit_ground_prob: float = BASE_FLOOR_PROB):
+    if skellam is None:
+        raise ImportError("scipy is required to use the win_prob function")
     # First, make it symmetric, so we only need to concern ourselves with non-negative differentials
     if differential < 0:
         p_loss = win_prob(goals_per_minute, time_left_seconds, -differential,
