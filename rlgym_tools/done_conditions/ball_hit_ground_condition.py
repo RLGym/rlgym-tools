@@ -17,6 +17,6 @@ class BallHitGroundCondition(DoneCondition[AgentID, GameState]):
         ticks_passed = state.tick_count - self.last_tick_count
         done = ball_hit_ground(ticks_passed, state.ball, pre=False)
 
-        self.last_tick_count = state
+        self.last_tick_count = state.tick_count
 
         return {agent: done for agent in agents}

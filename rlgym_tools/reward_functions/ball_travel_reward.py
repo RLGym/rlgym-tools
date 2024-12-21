@@ -53,7 +53,7 @@ class BallTravelReward(RewardFunction[AgentID, GameState, float]):
         self.distance_since_touch = 0
 
     def get_rewards(self, agents: List[AgentID], state: GameState, is_terminated: Dict[AgentID, bool],
-                    is_truncated: Dict[AgentID, bool], shared_info: Dict[str, Any]) -> Dict[AgentID, RewardType]:
+                    is_truncated: Dict[AgentID, bool], shared_info: Dict[str, Any]) -> Dict[AgentID, float]:
         ball_pos = state.ball.position
 
         # Update the distance travelled by the ball
