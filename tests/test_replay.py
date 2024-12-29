@@ -41,7 +41,7 @@ def main():
         flip_reset_reward = FlipResetReward()
         t = 0
         t0 = time.time()
-        for replay_frame in replay_to_rlgym(replay, calculate_error=True, action_options=lookup_table):
+        for replay_frame in replay_to_rlgym(replay, calculate_error=False):
             if t == 0:
                 flip_reset_reward.reset(list(replay_frame.state.cars.keys()), replay_frame.state, {})
 

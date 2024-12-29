@@ -1,7 +1,6 @@
-import time
 import warnings
 from copy import deepcopy
-from typing import Literal, Callable
+from typing import Literal, Callable, Iterable
 
 import numpy as np
 from rlgym.rocket_league.api import GameState, Car
@@ -12,9 +11,7 @@ from rlgym.rocket_league.state_mutators import FixedTeamSizeMutator, KickoffMuta
 
 from rlgym_tools.math.ball import ball_hit_ground
 from rlgym_tools.math.inverse_aerial_controls import aerial_inputs
-from rlgym_tools.misc.action import Action
 from rlgym_tools.replays.parsed_replay import ParsedReplay
-from rlgym_tools.replays.pick_action import get_best_action_options, get_weighted_action_options
 from rlgym_tools.replays.replay_frame import ReplayFrame
 from rlgym_tools.shared_info_providers.scoreboard_provider import ScoreboardInfo
 
@@ -32,9 +29,27 @@ except ImportError:
         return f
 
 
-def replay_to_rlgym(replay: ParsedReplay, interpolation: Literal["none", "linear", "rocketsim"] = "rocketsim",
-                    predict_pyr=True, calculate_error=False, action_options=None,
-                    step_rounding: Callable[[float], int] = round):
+def replay_to_rlgym(
+        replay: ParsedReplay,
+        interpolation: Literal["none", "linear", "rocketsim"] = "rocketsim",
+        predict_pyr=True,
+        calculate_error=False,
+        step_rounding: Callable[[float], int] = round,
+        modify_action_fn: Callable[[Car, np.ndarray], np.ndarray] = None
+) -> Iterable[ReplayFrame]:
+    """
+    Convert a parsed replay to a sequence of RLGym objects.
+
+    :param replay: The parsed replay to convert
+    :param interpolation: The interpolation mode to use. "none" uses the raw data, "linear" interpolates between frames,
+                          "rocketsim" uses RocketSim to interpolate between frames.
+    :param predict_pyr: Whether to predict pitch, yaw, roll from changes in quaternion
+                        (they're the only part of the action not provided by the replay)
+    :param calculate_error: Whether to calculate the error between the data from the replay and the interpolated data.
+    :param step_rounding: A function to round the number of ticks to step. Default is round.
+    :param modify_action_fn: A function to modify the action before it is used. Takes car and action as arguments.
+    :return: An iterable of ReplayFrame objects
+    """
     if interpolation not in ("none", "linear", "rocketsim"):
         raise ValueError(f"Interpolation mode {interpolation} not recognized")
     rocketsim_interpolation = interpolation == "rocketsim"
@@ -56,11 +71,6 @@ def replay_to_rlgym(replay: ParsedReplay, interpolation: Literal["none", "linear
 
     player_ids = sorted(int(k) for k in replay.player_dfs.keys())
 
-    total_pos_error = {}
-    total_quat_error = {}
-    total_vel_error = {}
-    total_ang_vel_error = {}
-    scoreboard = None
     # Track scoreline
     blue = orange = 0
     final_goal_diff = sum(-1 if goal["is_orange"] else 1 for goal in replay.metadata["game"]["goals"])
@@ -162,6 +172,7 @@ def replay_to_rlgym(replay: ParsedReplay, interpolation: Literal["none", "linear
 
             actions = {}
             update_age = {}
+            errors = {}
             for uid, player_row in zip(player_ids, car_rows):
                 car = state.cars[uid]
                 hit = (frame, uid) in hits
@@ -169,45 +180,18 @@ def replay_to_rlgym(replay: ParsedReplay, interpolation: Literal["none", "linear
                     action, error_pos, error_quat, error_vel, error_ang_vel \
                         = _update_car_and_get_action(car, linear_interpolation, player_row, state,
                                                      calculate_error=True, hit=hit)
-
                     if frame != start_frame and not np.isnan(error_pos):
-                        total_pos_error.setdefault(uid, []).append(error_pos)
-                        total_quat_error.setdefault(uid, []).append(error_quat)
-                        total_vel_error.setdefault(uid, []).append(error_vel)
-                        total_ang_vel_error.setdefault(uid, []).append(error_ang_vel)
-
-                    print(scoreboard)
-                    print(f"{uid}, {car.on_ground=}, {car.boost_amount=:.2f}, {car.can_flip=}, {car.is_flipping=}")
-                    print("replay action:\n\t" + str(Action.from_numpy(action)))
-
-                    for method in [get_weighted_action_options, get_best_action_options]:
-                        t0 = time.perf_counter()
-                        probs = method(car, action, action_options)
-                        t1 = time.perf_counter()
-                        idxs = np.where(probs > 0)[0]
-                        s = f"{method.__name__}: ({(t1 - t0) * 1000:.3f}ms)\n"
-                        if len(idxs) > 1:
-                            weighted_average = np.average(action_options, axis=0, weights=probs)
-                            s += f"WA: {Action.from_numpy(weighted_average)}\n"
-                        for idx in sorted(idxs, key=lambda k: -probs[k]):
-                            a = action_options[idx]
-                            a = Action.from_numpy(a)
-                            s += f"\t{a} ({probs[idx]:.0%})\n"
-                        print(s[:-1])
-
-                    # if not np.allclose(probs, probs2):
-                    #     debug = True
-
-                    # probs = np.ones(len(action_options)) / len(action_options)
-                    # probs = (action_options == 0).all(axis=1).astype(float)
-                    # probs = get_simple_action_options(car, action, action_options)
-                    # probs = get_weighted_action_options(car, action, action_options)
-                    # probs = get_best_action_options(car, action, action_options, greedy=False)
-
-                    # action = action_options[np.random.choice(len(action_options), p=probs)]
-                    print()
+                        errors[uid] = {
+                            "pos": error_pos,
+                            "quat": error_quat,
+                            "vel": error_vel,
+                            "ang_vel": error_ang_vel,
+                        }
                 else:
                     action = _update_car_and_get_action(car, linear_interpolation, player_row, state, hit=hit)
+
+                if modify_action_fn is not None:
+                    action = modify_action_fn(car, action)
 
                 actions[uid] = action
                 update_age[uid] = player_row.update_age if not player_row.is_demoed else 0
@@ -243,7 +227,10 @@ def replay_to_rlgym(replay: ParsedReplay, interpolation: Literal["none", "linear
                 next_scoring_team=next_scoring_team,
                 winning_team=winning_team,
             )
-            yield res
+            if calculate_error:
+                yield res, errors
+            else:
+                yield res
 
             if frame == end_frame:
                 break
@@ -257,31 +244,6 @@ def replay_to_rlgym(replay: ParsedReplay, interpolation: Literal["none", "linear
                 state = transition_engine.step(actions, {})
             else:
                 state = deepcopy(state)
-    if calculate_error:
-        import matplotlib.pyplot as plt
-        fig, axs = plt.subplots(nrows=4)
-        i = 0
-        for name, error in [("Position", total_pos_error), ("Quaternion", total_quat_error),
-                            ("Velocity", total_vel_error), ("Angular velocity", total_ang_vel_error)]:
-            for uid, errors in error.items():
-                error[uid] = np.array(errors)
-                axs[i].plot(error[uid], label=uid)
-            all_errors = np.concatenate(list(error.values()))
-
-            # print(f"{name} error: \n"
-            #       f"\tMean: {np.mean(all_errors):.3g}\n"
-            #       f"\tStd: {np.std(all_errors):.3g}\n"
-            #       f"\tMedian: {np.median(all_errors):.3g}\n"
-            #       f"\tMax: {np.max(all_errors):.3g}")
-            print(f"{name} error:")
-            print("\n".join([str(np.mean(all_errors)), str(np.std(all_errors)),
-                             str(np.median(all_errors)), str(np.max(all_errors))]))
-            # axs[i].hist(all_errors, bins=100)
-            # axs[i].set_yscale("log")
-            axs[i].set_title(name)
-            i += 1
-        fig.legend()
-        plt.show()
 
 
 def _prepare_segment_dfs(replay, start_frame, end_frame, linear_interpolation, predict_pyr):

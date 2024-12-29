@@ -55,10 +55,10 @@ class AdvancedLookupTableAction(LookupTableAction):
                  steer_bins: Any = 3,
                  torque_subdivisions: Any = 2,
                  flip_bins: Any = 8,
-                 include_stall: bool = False):
+                 include_stalls: bool = False):
         super().__init__()
         self._lookup_table = self.make_lookup_table(throttle_bins, steer_bins, torque_subdivisions, flip_bins,
-                                                    include_stall)
+                                                    include_stalls)
 
     @staticmethod
     def make_lookup_table(throttle_bins: Any = 3,
