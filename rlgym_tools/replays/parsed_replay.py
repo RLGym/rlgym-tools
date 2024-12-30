@@ -12,6 +12,7 @@ CARBALL_COMMAND = '{} -i "{}" -o "{}" parquet'
 
 ENV = os.environ.copy()
 ENV["NO_COLOR"] = "1"
+ENV["RUST_BACKTRACE"] = "full"
 
 
 def process_replay(replay_path, output_folder, carball_path=None, skip_existing=True):
