@@ -6,11 +6,11 @@ import numpy as np
 from rlgym.api import StateMutator
 from rlgym.rocket_league.api import GameState
 
-from rlgym_tools.misc.serialize import serialize_game_state, deserialize_game_state, deserialize_scoreboard, \
-    serialize_scoreboard, GS_CARS, GS_CAR_LENGTH, RF_AGENT_IDS_START, serialize_replay_frame, deserialize_replay_frame
-from rlgym_tools.replays.convert import replay_to_rlgym
-from rlgym_tools.replays.parsed_replay import ParsedReplay
-from rlgym_tools.replays.replay_frame import ReplayFrame
+from rlgym_tools.rocket_league.misc.serialize import GS_CARS, GS_CAR_LENGTH, RF_AGENT_IDS_START, serialize_replay_frame, \
+    deserialize_replay_frame
+from rlgym_tools.rocket_league.replays.convert import replay_to_rlgym
+from rlgym_tools.rocket_league.replays.parsed_replay import ParsedReplay
+from rlgym_tools.rocket_league.replays.replay_frame import ReplayFrame
 
 
 class ReplayMutator(StateMutator[GameState]):

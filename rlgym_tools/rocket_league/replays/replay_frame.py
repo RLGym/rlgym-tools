@@ -4,7 +4,7 @@ from typing import Dict, Optional
 import numpy as np
 from rlgym.rocket_league.api import GameState
 
-from rlgym_tools.shared_info_providers.scoreboard_provider import ScoreboardInfo
+from rlgym_tools.rocket_league.shared_info_providers.scoreboard_provider import ScoreboardInfo
 
 
 @dataclass(slots=True)

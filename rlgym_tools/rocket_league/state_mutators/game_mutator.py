@@ -4,7 +4,7 @@ from rlgym.api import StateMutator
 from rlgym.rocket_league.api import GameState
 from rlgym.rocket_league.state_mutators import KickoffMutator
 
-from rlgym_tools.shared_info_providers.scoreboard_provider import ScoreboardInfo
+from rlgym_tools.rocket_league.shared_info_providers.scoreboard_provider import ScoreboardInfo
 
 
 class GameMutator(StateMutator[GameState]):

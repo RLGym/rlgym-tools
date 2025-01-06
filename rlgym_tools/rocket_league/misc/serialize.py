@@ -11,8 +11,8 @@ from rlgym.rocket_league.reward_functions import GoalReward
 from rlgym.rocket_league.sim import RocketSimEngine
 from rlgym.rocket_league.state_mutators import KickoffMutator, FixedTeamSizeMutator, MutatorSequence
 
-from rlgym_tools.replays.replay_frame import ReplayFrame
-from rlgym_tools.shared_info_providers.scoreboard_provider import ScoreboardInfo
+from rlgym_tools.rocket_league.replays.replay_frame import ReplayFrame
+from rlgym_tools.rocket_league.shared_info_providers.scoreboard_provider import ScoreboardInfo
 
 
 # Utilities to serialize and deserialize RLGym Rocket League objects into numpy arrays
@@ -51,14 +51,22 @@ def deserialize(obj):
 
 
 def serialize_game_state(game_state: GameState) -> np.ndarray:
+    # Make sure agent IDs are compatible with serialization
+    aid_to_num = {}
+    for agent_id in sorted(game_state.cars.keys()):
+        if isinstance(agent_id, (float, int)):
+            aid_to_num[agent_id] = agent_id
+        else:
+            aid_to_num[agent_id] = len(aid_to_num)
+
     return np.concatenate([
         np.array([game_state.tick_count,
-                  int(game_state.goal_scored)]),
+                  game_state.goal_scored], dtype=np.float32),
         serialize_config(game_state.config),
         serialize_physics_object(game_state.ball),
         game_state.boost_pad_timers,
-        *[np.array([agent_id, *serialize_car(car)])
-          for agent_id, car in game_state.cars.items()]
+        *[np.array([aid_to_num[aid], *serialize_car(car, aid_to_num)], dtype=np.float32)
+          for aid, car in game_state.cars.items()]
     ], dtype=np.float32)
 
 
@@ -123,12 +131,13 @@ def deserialize_config(data: np.ndarray[tuple[Literal[3]], np.dtype[np.float32]]
     return config
 
 
-def serialize_car(car: Car) -> np.ndarray[tuple[Literal[42]], np.dtype[np.float32]]:
+def serialize_car(car: Car, bump_victim_map=None) -> np.ndarray[tuple[Literal[42]], np.dtype[np.float32]]:
     bump_victim = car.bump_victim_id
     if bump_victim is None:
         bump_victim = -1
     else:
-        bump_victim = int(bump_victim)
+        bump_victim_map = bump_victim_map or {}
+        bump_victim = int(bump_victim) if isinstance(bump_victim, (int, float)) else bump_victim_map.get(bump_victim, -2)
         assert bump_victim != -1, "Invalid bump victim ID (-1 is reserved for None)"
     return np.concatenate([
         np.array([car.team_num,

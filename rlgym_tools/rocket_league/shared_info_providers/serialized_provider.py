@@ -3,7 +3,7 @@ from typing import List, Dict, Any
 from rlgym.api import SharedInfoProvider, AgentID, StateType
 from rlgym.rocket_league.api import GameState
 
-from rlgym_tools.misc.serialize import serialize
+from rlgym_tools.rocket_league.misc.serialize import serialize
 
 
 class SerializedProvider(SharedInfoProvider[AgentID, GameState]):

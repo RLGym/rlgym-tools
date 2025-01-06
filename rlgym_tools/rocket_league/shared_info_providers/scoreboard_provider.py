@@ -6,7 +6,7 @@ from rlgym.api import SharedInfoProvider, AgentID
 from rlgym.rocket_league.api import GameState
 from rlgym.rocket_league.common_values import TICKS_PER_SECOND, BLUE_TEAM
 
-from rlgym_tools.math.ball import ball_hit_ground
+from rlgym_tools.rocket_league.math.ball import ball_hit_ground
 
 
 @dataclass(slots=True)

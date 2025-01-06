@@ -3,7 +3,7 @@ from typing import List, Dict, Any
 from rlgym.api import DoneCondition, AgentID
 from rlgym.rocket_league.api import GameState
 
-from rlgym_tools.math.ball import ball_hit_ground
+from rlgym_tools.rocket_league.math.ball import ball_hit_ground
 
 
 class BallHitGroundCondition(DoneCondition[AgentID, GameState]):

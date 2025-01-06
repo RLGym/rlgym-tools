@@ -7,7 +7,7 @@ from rlgym.rocket_league.api import GameState
 
 class BoostChangeReward(RewardFunction[AgentID, GameState, float]):
     def __init__(self, gain_weight: float = 1.0, lose_weight=1.0,
-                 activation_fn: Callable[[float], float] = math.sqrt):
+                 activation_fn: Callable[[float], float] = lambda x: math.sqrt(0.01 * x)):
         """
         Reward function that rewards agents for increasing their boost and penalizes them for decreasing it.
 

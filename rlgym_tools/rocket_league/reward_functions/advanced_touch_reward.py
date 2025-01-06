@@ -6,7 +6,7 @@ from rlgym.rocket_league.api import GameState
 from rlgym.rocket_league.common_values import BALL_MAX_SPEED
 
 
-class TouchReward(RewardFunction[AgentID, GameState, float]):
+class AdvancedTouchReward(RewardFunction[AgentID, GameState, float]):
     def __init__(self, touch_reward: float = 1.0, acceleration_reward: float = 0.0, use_touch_count: bool = True):
         self.touch_reward = touch_reward
         self.acceleration_reward = acceleration_reward

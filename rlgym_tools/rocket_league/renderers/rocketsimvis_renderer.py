@@ -41,7 +41,7 @@ class RocketSimVisRenderer(Renderer[GameState]):
         j = {
             'team_num': int(car.team_num),
             'phys': RocketSimVisRenderer.write_physobj(car.physics),
-            'boost_amount': car.boost_amount * 100,
+            'boost_amount': car.boost_amount,
             'on_ground': bool(car.on_ground),
             "has_flipped_or_double_jumped": bool(car.has_flipped or car.has_double_jumped),
             'is_demoed': bool(car.is_demoed),

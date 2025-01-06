@@ -5,10 +5,10 @@ import time
 import matplotlib.pyplot as plt
 from rlgym.rocket_league.common_values import TICKS_PER_SECOND
 
-from rlgym_tools.action_parsers.advanced_lookup_table_action import AdvancedLookupTableAction
-from rlgym_tools.replays.convert import replay_to_rlgym
-from rlgym_tools.replays.parsed_replay import ParsedReplay
-from rlgym_tools.reward_functions.flip_reset_reward import FlipResetReward
+from rlgym_tools.rocket_league.action_parsers.advanced_lookup_table_action import AdvancedLookupTableAction
+from rlgym_tools.rocket_league.replays.convert import replay_to_rlgym
+from rlgym_tools.rocket_league.replays.parsed_replay import ParsedReplay
+from rlgym_tools.rocket_league.reward_functions.flip_reset_reward import FlipResetReward
 
 
 def main():

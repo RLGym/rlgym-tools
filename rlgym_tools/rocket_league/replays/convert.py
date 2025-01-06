@@ -4,16 +4,17 @@ from typing import Literal, Callable, Iterable
 
 import numpy as np
 from rlgym.rocket_league.api import GameState, Car
-from rlgym.rocket_league.common_values import ORANGE_TEAM, BLUE_TEAM, TICKS_PER_SECOND, DOUBLEJUMP_MAX_DELAY
+from rlgym.rocket_league.common_values import ORANGE_TEAM, BLUE_TEAM, TICKS_PER_SECOND, DOUBLEJUMP_MAX_DELAY, \
+    FLIP_TORQUE_TIME
 from rlgym.rocket_league.math import quat_to_rot_mtx
 from rlgym.rocket_league.sim import RocketSimEngine
 from rlgym.rocket_league.state_mutators import FixedTeamSizeMutator, KickoffMutator
 
-from rlgym_tools.math.ball import ball_hit_ground
-from rlgym_tools.math.inverse_aerial_controls import aerial_inputs
-from rlgym_tools.replays.parsed_replay import ParsedReplay
-from rlgym_tools.replays.replay_frame import ReplayFrame
-from rlgym_tools.shared_info_providers.scoreboard_provider import ScoreboardInfo
+from rlgym_tools.rocket_league.math.ball import ball_hit_ground
+from rlgym_tools.rocket_league.math.inverse_aerial_controls import aerial_inputs
+from rlgym_tools.rocket_league.replays.parsed_replay import ParsedReplay
+from rlgym_tools.rocket_league.replays.replay_frame import ReplayFrame
+from rlgym_tools.rocket_league.shared_info_providers.scoreboard_provider import ScoreboardInfo
 
 try:
     import numba
@@ -56,7 +57,7 @@ def replay_to_rlgym(
     linear_interpolation = interpolation == "linear"
 
     players = {p["unique_id"]: p for p in replay.metadata["players"]}
-    transition_engine = RocketSimEngine()
+    transition_engine = RocketSimEngine(rlbot_delay=False)
     count_orange = sum(p["is_orange"] is True for p in players.values())
     base_mutator = FixedTeamSizeMutator(blue_size=len(players) - count_orange, orange_size=count_orange)
     kickoff_mutator = KickoffMutator()
@@ -153,6 +154,8 @@ def replay_to_rlgym(
 
         assert ball_tuples[0].pos_x == ball_tuples[0].pos_y == 0
 
+        # prev_actions = {uid: np.zeros(8) for uid in player_ids}
+
         # Iterate over the frames
         for i, game_row, ball_row, car_rows in zip(range(len(game_tuples)),
                                                    game_tuples,
@@ -237,7 +240,10 @@ def replay_to_rlgym(
 
             ticks = step_rounding(game_tuples[i + 1].time * TICKS_PER_SECOND - state.tick_count)
             for uid, action in actions.items():
-                actions[uid] = action.reshape(1, -1).repeat(ticks, axis=0)
+                repeated_action = action.reshape(1, -1).repeat(ticks, axis=0)
+                # repeated_action[:ticks // 2, :] = prev_actions[uid]
+                # prev_actions[uid] = action  # Keep the unrepeated action for the next frame
+                actions[uid] = repeated_action
 
             if rocketsim_interpolation:
                 transition_engine.set_state(state, {})
@@ -286,6 +292,10 @@ def _prepare_segment_dfs(replay, start_frame, end_frame, linear_interpolation, p
             # Set interpolate cols to NaN if they are repeated
             pdf.loc[is_repeat, physics_cols] = np.nan
             pdf = pdf.interpolate()  # Note that this assumes equal time steps
+        # # Shift the columns used for actions by 1 and add 0s for the first frame
+        # action_cols = ["throttle", "steer", "pitch", "yaw", "roll", "jumped", "dodged", "dodge_is_active",
+        #                "double_jumped", "flip_car_is_active", "boost_is_active", "handbrake"]
+        # pdf[action_cols] = pdf[action_cols].shift(-1).fillna(0.)
         player_dfs[int(uid)] = pdf
     game_df["episode_seconds_remaining"] = game_df["time"].iloc[-1] - game_df["time"]
 
@@ -352,7 +362,7 @@ def _update_car_and_get_action(car: Car, linear_interpolation: bool, player_row,
         car.physics.angular_velocity[:] = true_ang_vel
         car.physics.quaternion = np.array(true_quat)  # Uses property setter
 
-    car.boost_amount = player_row.boost_amount / 100
+    car.boost_amount = player_row.boost_amount
     throttle = 2 * player_row.throttle / 255 - 1
     steer = 2 * player_row.steer / 255 - 1
     if abs(throttle) < 0.01:
@@ -367,9 +377,8 @@ def _update_car_and_get_action(car: Car, linear_interpolation: bool, player_row,
     if player_row.dodged or player_row.double_jumped:
         # Make sure the car is in a valid state for dodging/double jumping
         car.has_flipped = False
-        car.is_flipping = False
         car.on_ground = False
-        car.is_jumping = False
+        # car.jump_time = 0
         car.is_holding_jump = False
         car.has_double_jumped = False
         if car.air_time_since_jump >= DOUBLEJUMP_MAX_DELAY:
@@ -400,9 +409,13 @@ def _update_car_and_get_action(car: Car, linear_interpolation: bool, player_row,
         actual_torque = actual_torque / (np.linalg.norm(actual_torque) or 1)
 
         car.on_ground = False
-        car.is_flipping = True
+        # car.is_flipping = True
         car.flip_torque = actual_torque
         car.has_flipped = True
+        if car.flip_time >= FLIP_TORQUE_TIME:
+            car.flip_time = FLIP_TORQUE_TIME - 1 / TICKS_PER_SECOND
+
+        assert not car.has_flip
 
         # Pitch/yaw/roll is handled by inverse aerial control function already,
         # it knows about the flip and detects the cancel automatically
@@ -411,12 +424,14 @@ def _update_car_and_get_action(car: Car, linear_interpolation: bool, player_row,
         mag = abs(pitch) + abs(yaw) + abs(roll)
         if mag >= state.config.dodge_deadzone:
             # Would not have been a double jump, but a dodge. Correct it
+            # {m>d, l*m<d} -> c<d/m for d>0 and m>d
+            # New magnitude will be 0.49 with default deadzone
             limiter = 0.98 * state.config.dodge_deadzone / mag
             pitch = pitch * limiter
             roll = roll * limiter
             yaw = yaw * limiter
         jump = 1
-    elif player_row.flip_car_is_active:
+    elif player_row.flip_car_is_active and not car.is_autoflipping:
         # I think this is autoflip?
         car.on_ground = False
         jump = 1

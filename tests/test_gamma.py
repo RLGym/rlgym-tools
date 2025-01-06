@@ -2,7 +2,7 @@ import math
 
 from rlgym.rocket_league.common_values import TICKS_PER_SECOND
 
-from rlgym_tools.math.gamma import half_life_to_gamma, horizon_to_gamma, gamma_to_half_life, gamma_to_horizon
+from rlgym_tools.rocket_league.math.gamma import half_life_to_gamma, horizon_to_gamma, gamma_to_half_life, gamma_to_horizon
 
 
 def main():

@@ -4,8 +4,8 @@ from rlgym.api import RewardFunction, AgentID
 from rlgym.rocket_league.api import GameState
 from rlgym.rocket_league.common_values import BLUE_TEAM
 
-from rlgym_tools.math.ball import GOAL_THRESHOLD
-from rlgym_tools.math.solid_angle import view_goal_ratio
+from rlgym_tools.rocket_league.math.ball import GOAL_THRESHOLD
+from rlgym_tools.rocket_league.math.solid_angle import view_goal_ratio
 
 
 class GoalProbReward(RewardFunction[AgentID, GameState, float]):

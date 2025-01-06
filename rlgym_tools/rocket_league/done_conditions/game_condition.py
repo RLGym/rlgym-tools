@@ -5,7 +5,7 @@ from rlgym.rocket_league.api import GameState
 from rlgym.rocket_league.common_values import BLUE_TEAM, BALL_RADIUS
 from rlgym.rocket_league.common_values import TICKS_PER_SECOND
 
-from rlgym_tools.shared_info_providers.scoreboard_provider import ScoreboardInfo
+from rlgym_tools.rocket_league.shared_info_providers.scoreboard_provider import ScoreboardInfo
 
 
 class GameCondition(DoneCondition[AgentID, GameState]):

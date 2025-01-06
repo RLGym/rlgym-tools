@@ -9,7 +9,22 @@ __version__ = '2.0.0'
 
 release_notes = {
     '2.0.0': """
-       - Move to RLGym v2
+       Move to RLGym v2:
+       - Remove all v1 code
+       - Add action parsers: ActionHistoryWrapper, AdvancedLookupTableAction, DelayedAction, QueuedAction
+       - Add done conditions: BallHitGroundCondition, CarOnGroundCondition, GameCondition
+       - Add math utils for ball, gamma, inverse aerial controls, relative physics, skellam distribution and solid angle
+       - Add Action dataclass and serialization
+       - Add obs builder: RelativeDefaultObs
+       - Add renderer: RocketSimVisRenderer
+       - Add new replay parser and replay converter to new ReplayFrame object
+       - Add rewards: AdvancedTouchReward, AerialDistanceReward, BallTravelReward, BoostChangeReward, BoostKeepReward, 
+                      DemoReward, EpisodeEndReward, FlipResetReward, GoalProbReward, StackReward, 
+                      TeamSpiritRewardWrapper, VelocityPlayerToBallReward, WaveDashReward
+       - Add shared info providers: BallPredictionProvider, MultiProvider, ScoreboardProvider, SerializedProvider
+       - Add state mutators: AugmentMutator, ConfigMutator, GameMutator, HitboxMutator, RandomScoreboardMutator, 
+                             ReplayMutator, VariableTeamSizeMutator, WeightedSampleMutator
+       - Add transition engine: MultiEnvEngine
     """,
     '1.8.3': """
        - Update parse_actions in lookup_act.py (Jeff)

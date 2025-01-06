@@ -1,36 +1,40 @@
 import time
 
 import numpy as np
+
 from rlgym.api import RLGym
 from rlgym.rocket_league.action_parsers import RepeatAction
 from rlgym.rocket_league.common_values import TICKS_PER_SECOND
+from rlgym.rocket_league.done_conditions import NoTouchTimeoutCondition
 from rlgym.rocket_league.reward_functions import GoalReward
-from rlgym.rocket_league.rlviser import RLViserRenderer
 from rlgym.rocket_league.sim import RocketSimEngine
-from rlgym.rocket_league.state_mutators import MutatorSequence
-
-from rlgym_tools.action_parsers.action_history_wrapper import ActionHistoryWrapper
-from rlgym_tools.action_parsers.advanced_lookup_table_action import AdvancedLookupTableAction
-from rlgym_tools.action_parsers.delayed_action import DelayedAction
-from rlgym_tools.action_parsers.queued_action import QueuedAction
-from rlgym_tools.done_conditions.game_condition import GameCondition
-from rlgym_tools.math.gamma import half_life_to_gamma
-from rlgym_tools.obs_builders.relative_default_obs import RelativeDefaultObs
-from rlgym_tools.reward_functions.aerial_distance_reward import AerialDistanceReward
-from rlgym_tools.reward_functions.demo_reward import DemoReward
-from rlgym_tools.reward_functions.flip_reset_reward import FlipResetReward
-from rlgym_tools.reward_functions.goal_prob_reward import GoalViewReward
-from rlgym_tools.reward_functions.stack_reward import StackReward
-from rlgym_tools.reward_functions.team_spirit_reward_wrapper import TeamSpiritRewardWrapper
-from rlgym_tools.reward_functions.velocity_player_to_ball_reward import VelocityPlayerToBallReward
-from rlgym_tools.shared_info_providers.ball_prediction_provider import BallPredictionProvider
-from rlgym_tools.shared_info_providers.multi_provider import MultiProvider
-from rlgym_tools.shared_info_providers.scoreboard_provider import ScoreboardProvider
-from rlgym_tools.state_mutators.augment_mutator import AugmentMutator
-from rlgym_tools.state_mutators.config_mutator import ConfigMutator
-from rlgym_tools.state_mutators.game_mutator import GameMutator
-from rlgym_tools.state_mutators.variable_team_size_mutator import VariableTeamSizeMutator
-from rlgym_tools.state_mutators.weighted_sample_mutator import WeightedSampleMutator
+from rlgym.rocket_league.state_mutators import MutatorSequence, KickoffMutator
+from rlgym_tools.rocket_league.action_parsers.action_history_wrapper import ActionHistoryWrapper
+from rlgym_tools.rocket_league.action_parsers.advanced_lookup_table_action import AdvancedLookupTableAction
+from rlgym_tools.rocket_league.action_parsers.delayed_action import DelayedAction
+from rlgym_tools.rocket_league.action_parsers.queued_action import QueuedAction
+from rlgym_tools.rocket_league.done_conditions.game_condition import GameCondition
+from rlgym_tools.rocket_league.math.gamma import half_life_to_gamma
+from rlgym_tools.rocket_league.obs_builders.relative_default_obs import RelativeDefaultObs
+from rlgym_tools.rocket_league.renderers.rocketsimvis_renderer import RocketSimVisRenderer
+from rlgym_tools.rocket_league.reward_functions.aerial_distance_reward import AerialDistanceReward
+from rlgym_tools.rocket_league.reward_functions.demo_reward import DemoReward
+from rlgym_tools.rocket_league.reward_functions.flip_reset_reward import FlipResetReward
+from rlgym_tools.rocket_league.reward_functions.goal_prob_reward import GoalViewReward
+from rlgym_tools.rocket_league.reward_functions.stack_reward import StackReward
+from rlgym_tools.rocket_league.reward_functions.team_spirit_reward_wrapper import TeamSpiritRewardWrapper
+from rlgym_tools.rocket_league.reward_functions.velocity_player_to_ball_reward import VelocityPlayerToBallReward
+from rlgym_tools.rocket_league.shared_info_providers.ball_prediction_provider import BallPredictionProvider
+from rlgym_tools.rocket_league.shared_info_providers.multi_provider import MultiProvider
+from rlgym_tools.rocket_league.shared_info_providers.scoreboard_provider import ScoreboardProvider
+from rlgym_tools.rocket_league.shared_info_providers.serialized_provider import SerializedProvider
+from rlgym_tools.rocket_league.state_mutators.augment_mutator import AugmentMutator
+from rlgym_tools.rocket_league.state_mutators.config_mutator import ConfigMutator
+from rlgym_tools.rocket_league.state_mutators.game_mutator import GameMutator
+from rlgym_tools.rocket_league.state_mutators.hitbox_mutator import HitboxMutator
+from rlgym_tools.rocket_league.state_mutators.random_scoreboard_mutator import RandomScoreboardMutator
+from rlgym_tools.rocket_league.state_mutators.variable_team_size_mutator import VariableTeamSizeMutator
+from rlgym_tools.rocket_league.state_mutators.weighted_sample_mutator import WeightedSampleMutator
 
 
 def main():
@@ -50,10 +54,13 @@ def main():
         state_mutator=MutatorSequence(
             ConfigMutator(boost_consumption=0.1),
             VariableTeamSizeMutator({(1, 1): 2 / 9, (2, 2): 5 / 9, (3, 3): 2 / 9}),
+            KickoffMutator(),
+            HitboxMutator("dominus"),
             WeightedSampleMutator.from_zipped(
                 # (ReplayMutator(), 0.5),  # TODO: Implement ReplayMutator
                 (GameMutator(), 0.5),
             ),
+            RandomScoreboardMutator(),
             AugmentMutator()
         ),
         obs_builder=RelativeDefaultObs(),
@@ -64,18 +71,20 @@ def main():
                         AdvancedLookupTableAction(),
                         repeats=tick_skip),
                     action_queue_size=3
-                )
+                ),
+                delay_ticks=tick_skip - 1,
             ),
         ),
         reward_fn=TeamSpiritRewardWrapper(StackReward(rewards), team_spirit=0.5),
         transition_engine=RocketSimEngine(),
         termination_cond=GameCondition(seconds_per_goal_forfeit=10, max_overtime_seconds=300),
-        truncation_cond=None,
+        truncation_cond=NoTouchTimeoutCondition(timeout_seconds=60),
         shared_info_provider=MultiProvider(
             ScoreboardProvider(),
-            BallPredictionProvider(5, 0.5),
+            BallPredictionProvider(limit_seconds=5, step_seconds=0.5),
+            SerializedProvider()
         ),
-        renderer=RLViserRenderer(tick_rate=TICKS_PER_SECOND / tick_skip),
+        renderer=RocketSimVisRenderer(),
     )
 
     while True:
@@ -98,7 +107,7 @@ def main():
             done = any(is_terminated.values()) or any(is_truncated.values())
             env.render()
             ts1 = time.perf_counter()
-            time.sleep(max(0, tick_skip / TICKS_PER_SECOND - (ts1 - ts0)))
+            # time.sleep(max(0, tick_skip / TICKS_PER_SECOND - (ts1 - ts0)))
         t1 = time.perf_counter()
         print(f"Episode done.\n"
               f"\t{n} steps in {t1 - t0:.1f}s ({n / (t1 - t0):.1f} sps)\n"

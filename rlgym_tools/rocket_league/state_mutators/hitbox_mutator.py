@@ -24,5 +24,5 @@ class HitboxMutator(StateMutator[GameState]):
         self.hitbox_type = hitbox_type
 
     def apply(self, state: GameState, shared_info: Dict[str, Any]) -> None:
-        for car in state.cars:
+        for car in state.cars.values():
             car.hitbox_type = self.hitbox_type
