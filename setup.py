@@ -19,7 +19,7 @@ setup(
         'rlgym>=2.0.0',  # Including release candidates starting from 2.0.0
         'rlgym-rocket-league[sim]>=2.0.0'  # Remove if we ever add other envs
     ],
-    python_requires='>=3.9',
+    python_requires='>=3.7',
     license='Apache 2.0',
     license_file='LICENSE',
     keywords=['rocket-league', 'gym', 'reinforcement-learning'],
