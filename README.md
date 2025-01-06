@@ -16,4 +16,4 @@ Community contributions are welcome!
 Check out the [RLGym wiki](https://rlgym.github.io/) for more info: 
 
 ## Installation
-`pip install rlgym-tools`
+`pip install -U rlgym-tools`
