@@ -5,10 +5,13 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.0.1'
+__version__ = '2.0.2'
 
 
 release_notes = {
+    '2.0.2': """
+       - Add carball.exe to package_data
+    """,
     '2.0.1': """
        - Fix serialization (added wheel contacts and padded replay frame support, and tested with new script)
        - Fix ReplayMutator
