@@ -1,3 +1,4 @@
+import glob
 import time
 
 import numpy as np
@@ -33,6 +34,7 @@ from rlgym_tools.rocket_league.state_mutators.config_mutator import ConfigMutato
 from rlgym_tools.rocket_league.state_mutators.game_mutator import GameMutator
 from rlgym_tools.rocket_league.state_mutators.hitbox_mutator import HitboxMutator
 from rlgym_tools.rocket_league.state_mutators.random_scoreboard_mutator import RandomScoreboardMutator
+from rlgym_tools.rocket_league.state_mutators.replay_mutator import ReplayMutator
 from rlgym_tools.rocket_league.state_mutators.variable_team_size_mutator import VariableTeamSizeMutator
 from rlgym_tools.rocket_league.state_mutators.weighted_sample_mutator import WeightedSampleMutator
 
@@ -40,6 +42,12 @@ from rlgym_tools.rocket_league.state_mutators.weighted_sample_mutator import Wei
 def main():
     tick_skip = 12
     gamma = half_life_to_gamma(half_life_seconds=10, tick_skip=tick_skip)
+
+    replay_frames = ReplayMutator.make_file(
+        replay_files=glob.glob("test_replays/0*.replay"),
+        output_path=None,
+        max_num_players=6,
+    )
 
     rewards = [GoalReward(),
                AerialDistanceReward(touch_height_weight=1 / 2044,
@@ -57,7 +65,7 @@ def main():
             KickoffMutator(),
             HitboxMutator("dominus"),
             WeightedSampleMutator.from_zipped(
-                # (ReplayMutator(), 0.5),  # TODO: Implement ReplayMutator
+                (ReplayMutator(replay_frames), 0.5),
                 (GameMutator(), 0.5),
             ),
             RandomScoreboardMutator(),

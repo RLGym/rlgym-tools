@@ -315,16 +315,17 @@ def serialize_replay_frame(replay_frame: ReplayFrame):
     # next_scoring_team: Optional[int]
     # winning_team: Optional[int]
     aid_to_num = {}
-    for agent_id in sorted(replay_frame.state.cars.keys()):
+    agent_ids = sorted(replay_frame.state.cars.keys())
+    for agent_id in agent_ids:
         if isinstance(agent_id, (float, int)):
             aid_to_num[agent_id] = agent_id
         else:
             aid_to_num[agent_id] = len(aid_to_num)
 
     num_players = len(replay_frame.state.cars)
-    agent_ids = np.array([aid_to_num[agent_id] for agent_id in replay_frame.state.cars.keys()], dtype=np.float32)
     update_ages = np.array([replay_frame.update_age[agent_id] for agent_id in agent_ids], dtype=np.float32)
     actions = np.array([replay_frame.actions[agent_id] for agent_id in agent_ids], dtype=np.float32)
+    agent_ids = np.array([aid_to_num[agent_id] for agent_id in agent_ids], dtype=np.float32)
 
     serialized_game_state = serialize_game_state(replay_frame.state, aid_to_num)
     s = np.zeros(6 + 3 + 1 + num_players + num_players + num_players * RF_ACTION_SIZE + serialized_game_state.shape[0],
@@ -364,7 +365,8 @@ def deserialize_replay_frame(data: np.ndarray):
     k += num_players
     actions = data[k:k + num_players * RF_ACTION_SIZE].reshape(num_players, RF_ACTION_SIZE)
     k += num_players * RF_ACTION_SIZE
-    state = deserialize_game_state(data[k:])
+    state = deserialize_game_state(data[k:k + GS_CARS.start + num_players * GS_CAR_LENGTH])
+    # assert np.all(data[k + GS_CARS.start + num_players * GS_CAR_LENGTH:] == 0), "Invalid padding"
 
     return ReplayFrame(
         state=state,
@@ -375,4 +377,3 @@ def deserialize_replay_frame(data: np.ndarray):
         next_scoring_team=next_scoring_team,
         winning_team=winning_team,
     )
-

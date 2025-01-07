@@ -7,7 +7,7 @@ from rlgym.api import StateMutator
 from rlgym.rocket_league.api import GameState
 
 from rlgym_tools.rocket_league.misc.serialize import GS_CARS, GS_CAR_LENGTH, RF_AGENT_IDS_START, serialize_replay_frame, \
-    deserialize_replay_frame
+    deserialize_replay_frame, RF_ACTION_SIZE
 from rlgym_tools.rocket_league.replays.convert import replay_to_rlgym
 from rlgym_tools.rocket_league.replays.parsed_replay import ParsedReplay
 from rlgym_tools.rocket_league.replays.replay_frame import ReplayFrame
@@ -59,7 +59,7 @@ class ReplayMutator(StateMutator[GameState]):
         idx = np.random.choice(len(self.replay_frames), p=self.probabilities)
         replay_frame = self[idx]
         new_state = replay_frame.state
-        state.tick_count = new_state.tick_count
+        state.tick_count = round(new_state.tick_count)
         state.goal_scored = new_state.goal_scored
         state.config = new_state.config
         state.cars = new_state.cars
@@ -76,12 +76,13 @@ class ReplayMutator(StateMutator[GameState]):
                   frame_skip: int = 30,
                   interpolation: Literal["none", "linear", "rocketsim"] = "rocketsim",
                   carball_path=None,
-                  max_num_players=6) -> Tuple[np.ndarray, np.ndarray]:
+                  max_num_players=6) -> np.ndarray:
         size = len(replay_files) * 5 * 60 * 30 // frame_skip  # Initial guess of frame count
 
         max_state_size = GS_CARS.start + max_num_players * GS_CAR_LENGTH
         max_replay_frame_size = (RF_AGENT_IDS_START
-                                 + 3 * max_num_players  # agent_id, update_age, actions
+                                 + 2 * max_num_players  # agent_id, update_age
+                                 + max_num_players * RF_ACTION_SIZE  # actions
                                  + max_state_size)
 
         if do_memory_map:
@@ -97,21 +98,29 @@ class ReplayMutator(StateMutator[GameState]):
             for replay_frame in replay_to_rlgym(parsed_replay, interpolation, predict_pyr=True, calculate_error=False):
                 if frame % frame_skip == 0:
                     serialized_frame = serialize_replay_frame(replay_frame)
+                    # if (frame // frame_skip) % frame_skip == 0:
+                    #     d1 = deserialize_replay_frame(serialized_frame)
+                    #     s2 = np.zeros(max_replay_frame_size, dtype=np.float32)
+                    #     s2[:len(serialized_frame)] = serialized_frame
+                    #     d2 = deserialize_replay_frame(s2)
+                    #     debug = True
 
                     if i >= size:
                         # Make a new estimate of the size of the replay files and expand the arrays
                         frames_per_replay = (i + 1) / (k or 1)
                         new_size = (len(replay_files) + 1) * frames_per_replay  # +1 so we don't have to resize a lot
-                        replay_frames.resize((new_size, max_replay_frame_size))
+                        new_size = round(new_size)
+                        # Shouldn't need refcheck, just makes it fail in debug mode
+                        replay_frames.resize((new_size, max_replay_frame_size), refcheck=False)
 
                     replay_frames[i, :len(serialized_frame)] = serialized_frame
 
                     i += 1
                 frame += 1
 
-        replay_frames.resize((i, max_replay_frame_size))
+        replay_frames.resize((i, max_replay_frame_size), refcheck=False)
 
-        if not do_memory_map:
+        if not do_memory_map and output_path is not None:
             np.savez_compressed(output_path, replay_frames=replay_frames)
 
         return replay_frames
