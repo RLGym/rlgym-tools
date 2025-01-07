@@ -5,10 +5,13 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.0.2'
+__version__ = '2.0.3'
 
 
 release_notes = {
+    '2.0.3': """
+        - Update MANIFEST.in to include carball.exe
+    """,
     '2.0.2': """
        - Add carball.exe to package_data
     """,
