@@ -5,10 +5,14 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.0.3'
+__version__ = '2.1.0'
 
 
 release_notes = {
+    '2.1.0': """
+    - Add reward reporting tools for inspecting rewards with replays
+    - Add some convenience methods to the Action dataclass
+    """,
     '2.0.3': """
         - Update MANIFEST.in to include carball.exe
     """,
