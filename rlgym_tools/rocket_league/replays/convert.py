@@ -5,7 +5,7 @@ from typing import Literal, Callable, Iterable
 import numpy as np
 from rlgym.rocket_league.api import GameState, Car
 from rlgym.rocket_league.common_values import ORANGE_TEAM, BLUE_TEAM, TICKS_PER_SECOND, DOUBLEJUMP_MAX_DELAY, \
-    FLIP_TORQUE_TIME
+    FLIP_TORQUE_TIME, JUMP_MAX_TIME, CAR_MAX_SPEED
 from rlgym.rocket_league.math import quat_to_rot_mtx
 from rlgym.rocket_league.sim import RocketSimEngine
 from rlgym.rocket_league.state_mutators import FixedTeamSizeMutator, KickoffMutator
@@ -33,8 +33,8 @@ except ImportError:
 def replay_to_rlgym(
         replay: ParsedReplay,
         interpolation: Literal["none", "linear", "rocketsim"] = "rocketsim",
-        predict_pyr=True,
-        calculate_error=False,
+        predict_pyr: bool = True,
+        calculate_error: bool = False,
         step_rounding: Callable[[float], int] = round,
         modify_action_fn: Callable[[Car, np.ndarray], np.ndarray] = None
 ) -> Iterable[ReplayFrame]:
@@ -44,7 +44,7 @@ def replay_to_rlgym(
     :param replay: The parsed replay to convert
     :param interpolation: The interpolation mode to use. "none" uses the raw data, "linear" interpolates between frames,
                           "rocketsim" uses RocketSim to interpolate between frames.
-    :param predict_pyr: Whether to predict pitch, yaw, roll from changes in quaternion
+    :param predict_pyr: Whether to predict pitch, yaw, roll from changes in angular velocity
                         (they're the only part of the action not provided by the replay)
     :param calculate_error: Whether to calculate the error between the data from the replay and the interpolated data.
     :param step_rounding: A function to round the number of ticks to step. Default is round.
@@ -142,6 +142,8 @@ def replay_to_rlgym(
                                                             linear_interpolation, predict_pyr)
         next_scoring_team = None
         if goal_frame is not None:
+            # Get last index of ball_df, as it may have been shortened
+            end_frame = goal_frame = ball_df.index[-1]
             next_scoring_team = BLUE_TEAM if ball_df["pos_y"].iloc[-1] > 0 else ORANGE_TEAM
 
         # Prepare tuples for faster iteration
@@ -176,19 +178,25 @@ def replay_to_rlgym(
             actions = {}
             update_age = {}
             errors = {}
+
             for uid, player_row in zip(player_ids, car_rows):
                 car = state.cars[uid]
                 hit = (frame, uid) in hits
+
                 if calculate_error:  # and i > 0 and not player_rows[player_ids.index(uid)][i - 1].is_repeat:
-                    action, error_pos, error_quat, error_vel, error_ang_vel \
+                    action, error_pos, error_quat, error_vel, error_ang_vel, error_car_state \
                         = _update_car_and_get_action(car, linear_interpolation, player_row, state,
                                                      calculate_error=True, hit=hit)
-                    if frame != start_frame and not np.isnan(error_pos):
+                    if (frame != start_frame  # Need to set the initial state first
+                            and frame != goal_frame  # Goals can send players flying
+                            and not np.isnan(error_pos)  # It returns nan during repeat frames
+                            and not car.is_demoed):  # Demoed cars just retain their physics from before the demo
                         errors[uid] = {
                             "pos": error_pos,
                             "quat": error_quat,
                             "vel": error_vel,
                             "ang_vel": error_ang_vel,
+                            "car_state": error_car_state,
                         }
                 else:
                     action = _update_car_and_get_action(car, linear_interpolation, player_row, state, hit=hit)
@@ -198,6 +206,23 @@ def replay_to_rlgym(
 
                 actions[uid] = action
                 update_age[uid] = player_row.update_age if not player_row.is_demoed else 0
+
+            # Now detect demos so bump victims are correctly set
+            for uid, player_row in zip(player_ids, car_rows):
+                if player_row.got_demoed:
+                    closest = None
+                    for uid2 in player_ids:
+                        if uid == uid2:
+                            continue
+                        if state.cars[uid2].bump_victim_id == uid:
+                            break  # Trust this if available
+                        else:
+                            dist = np.linalg.norm(state.cars[uid].physics.position - state.cars[uid2].physics.position)
+                            if closest is None or dist < closest[1]:
+                                closest = (uid2, dist)
+                    else:
+                        if closest[1] < 200 + 2 * CAR_MAX_SPEED * average_tick_rate / TICKS_PER_SECOND:
+                            state.cars[closest[0]].bump_victim_id = uid
 
             if state.goal_scored:
                 if state.scoring_team == BLUE_TEAM:
@@ -253,28 +278,57 @@ def replay_to_rlgym(
 
 
 def _prepare_segment_dfs(replay, start_frame, end_frame, linear_interpolation, predict_pyr):
-    game_df = replay.game_df.loc[start_frame:end_frame].astype(float)
     ball_df = replay.ball_df.loc[start_frame:end_frame].astype(float)
+    # Find the first frame where the ball is sleeping and not at the origin, that's when the goal actually happens       
+    actual_goal = ball_df.index[(ball_df["is_sleeping"] == 1) & (ball_df["pos_x"] != 0) & (ball_df["pos_y"] != 0)]
+    if len(actual_goal) > 0 and actual_goal[0] < end_frame:
+        end_frame = actual_goal[0]
+        ball_df = ball_df.loc[:end_frame]
+    game_df = replay.game_df.loc[start_frame:end_frame].astype(float)
+
+    # Fill missing ball values
     ball_df["quat_w"] = ball_df["quat_w"].fillna(1.0)
     ball_df = ball_df.ffill().fillna(0.)
+
+    # Players
     player_dfs = {}
     for uid, pdf in replay.player_dfs.items():
         pdf = pdf.loc[start_frame:end_frame].astype(float)
         physics_cols = ([f"{col}_{axis}" for col in ("pos", "vel", "ang_vel") for axis in "xyz"] +
                         [f"quat_{axis}" for axis in "wxyz"])
+
+        # Physics info is repeated 1-3 times, so we need to not use those values
         is_repeat = (pdf[physics_cols].diff() == 0).all(axis=1)
+
         # If something repeats for 4 or more frames, assume it's not a real repeat, just the player standing still
         is_repeat &= (is_repeat.rolling(4).sum() < 4)
+
+        # Physics info is nan while the player is demoed
         is_demoed = pdf["pos_x"].isna()
+
+        # Interpolate, smooth, and shift (essentially shift by -0.5)
         pdf[["throttle", "steer"]] = pdf[["throttle", "steer"]].ffill().fillna(255 / 2)
+        pdf.loc[is_repeat, ["throttle", "steer"]] = np.nan
+        pdf[["throttle", "steer"]] = (pdf[["throttle", "steer"]].interpolate()
+                                      .rolling(2).mean().shift(-1, fill_value=255 / 2))
+
+        # Remove nans
         pdf = pdf.ffill().fillna(0.)
-        pdf["is_repeat"] = is_repeat.astype(float)
+        pdf["is_repeat"] = is_repeat
         pdf["is_demoed"] = is_demoed.astype(float)
         pdf["got_demoed"] = pdf["is_demoed"].diff() > 0
         pdf["respawned"] = pdf["is_demoed"].diff() < 0
-        pdf["jumped"] = pdf["jump_is_active"].fillna(0.).diff() > 0
-        pdf["dodged"] = pdf["dodge_is_active"].fillna(0.).diff() > 0
-        pdf["double_jumped"] = pdf["double_jump_is_active"].fillna(0.).diff() > 0
+
+        # We need to make sure we do some actions 1 frame before so they're active when they're supposed to be
+        # We treat jump and dodge differently on first frame since the requirements are different
+        pdf["jumped"] = (pdf["jump_is_active"].diff() > 0).shift(-1, fill_value=False)
+        pdf["dodged"] = (pdf["dodge_is_active"].diff() > 0).shift(-1, fill_value=False)
+        pdf[["dodge_torque_x", "dodge_torque_y"]] = pdf[["dodge_torque_x", "dodge_torque_y"]].shift(-1, fill_value=0.)
+        pdf["double_jumped"] = (pdf["double_jump_is_active"].diff() > 0).shift(-1, fill_value=False)
+        boosted = (pdf["boost_is_active"].diff() > 0).shift(-1, fill_value=False)
+        pdf.loc[boosted, "boost_is_active"] = 1
+        flipped_car = (pdf["flip_car_is_active"].diff() > 0).shift(-1, fill_value=False)
+        pdf.loc[flipped_car, "flip_car_is_active"] = 1
 
         times = game_df["time"].copy()
         times[is_repeat] = np.nan
@@ -286,16 +340,15 @@ def _prepare_segment_dfs(replay, start_frame, end_frame, linear_interpolation, p
         if predict_pyr:
             pyrs = pyr_from_dataframe(game_df, pdf)
             pdf.loc[~is_repeat, pyr_cols] = pyrs
+        # ffill because pyr calculation makes a smooth transition from one angvel to the next
         pdf[pyr_cols] = pdf[pyr_cols].ffill().fillna(0.)
+
         # Player physics info is repeated 1-3 times, so we need to remove those
         if linear_interpolation:
             # Set interpolate cols to NaN if they are repeated
             pdf.loc[is_repeat, physics_cols] = np.nan
             pdf = pdf.interpolate()  # Note that this assumes equal time steps
-        # # Shift the columns used for actions by 1 and add 0s for the first frame
-        # action_cols = ["throttle", "steer", "pitch", "yaw", "roll", "jumped", "dodged", "dodge_is_active",
-        #                "double_jumped", "flip_car_is_active", "boost_is_active", "handbrake"]
-        # pdf[action_cols] = pdf[action_cols].shift(-1).fillna(0.)
+
         player_dfs[int(uid)] = pdf
     game_df["episode_seconds_remaining"] = game_df["time"].iloc[-1] - game_df["time"]
 
@@ -336,12 +389,25 @@ def _prepare_segment_dfs(replay, start_frame, end_frame, linear_interpolation, p
 
 def _update_car_and_get_action(car: Car, linear_interpolation: bool, player_row, state: GameState,
                                calculate_error=False, hit: bool = False):
-    error_pos = error_quat = error_vel = error_ang_vel = np.nan
+    error_pos = error_quat = error_vel = error_ang_vel = error_car_state = np.nan
     if linear_interpolation or not player_row.is_repeat:
         true_pos = (player_row.pos_x, player_row.pos_y, player_row.pos_z)
         true_vel = (player_row.vel_x, player_row.vel_y, player_row.vel_z)
         true_ang_vel = (player_row.ang_vel_x, player_row.ang_vel_y, player_row.ang_vel_z)
         true_quat = (player_row.quat_w, player_row.quat_x, player_row.quat_y, player_row.quat_z)
+
+        if calculate_error and not (player_row.respawned or (player_row.is_demoed and not player_row.got_demoed)):
+            error_pos = np.linalg.norm(car.physics.position - np.array(true_pos))
+            error_quat = min(np.linalg.norm(car.physics.quaternion - np.array(true_quat)),
+                             np.linalg.norm(car.physics.quaternion + np.array(true_quat)))
+            error_vel = np.linalg.norm(car.physics.linear_velocity - np.array(true_vel))
+            error_ang_vel = np.linalg.norm(car.physics.angular_velocity - np.array(true_ang_vel))
+            error_car_state = sum((  # Directly known information about the car from the replay
+                car.is_demoed != player_row.is_demoed,
+                abs(car.boost_amount - player_row.boost_amount) / 100,
+                car.is_jumping != player_row.jump_is_active,
+                car.is_flipping != player_row.dodge_is_active,
+            ))
 
         if player_row.got_demoed and not car.is_demoed:
             car.demo_respawn_timer = 3
@@ -349,13 +415,6 @@ def _update_car_and_get_action(car: Car, linear_interpolation: bool, player_row,
             car.demo_respawn_timer = 1 / TICKS_PER_SECOND
         elif not player_row.is_demoed and car.is_demoed:
             car.demo_respawn_timer = 0
-
-        if calculate_error and not player_row.respawned:
-            error_pos = np.linalg.norm(car.physics.position - np.array(true_pos))
-            error_quat = min(np.linalg.norm(car.physics.quaternion - np.array(true_quat)),
-                             np.linalg.norm(car.physics.quaternion + np.array(true_quat)))
-            error_vel = np.linalg.norm(car.physics.linear_velocity - np.array(true_vel))
-            error_ang_vel = np.linalg.norm(car.physics.angular_velocity - np.array(true_ang_vel))
 
         car.physics.position[:] = true_pos
         car.physics.linear_velocity[:] = true_vel
@@ -377,8 +436,8 @@ def _update_car_and_get_action(car: Car, linear_interpolation: bool, player_row,
     if player_row.dodged or player_row.double_jumped:
         # Make sure the car is in a valid state for dodging/double jumping
         car.has_flipped = False
-        car.on_ground = False
-        # car.jump_time = 0
+        if car.on_ground:
+            car.on_ground = False
         car.is_holding_jump = False
         car.has_double_jumped = False
         if car.air_time_since_jump >= DOUBLEJUMP_MAX_DELAY:
@@ -386,8 +445,22 @@ def _update_car_and_get_action(car: Car, linear_interpolation: bool, player_row,
         assert car.can_flip
 
     if player_row.jumped:
-        car.on_ground = True
-        car.has_jumped = False
+        if not car.on_ground:
+            car.on_ground = True
+        jump = 1
+    elif player_row.jump_is_active:
+        # assert not car.on_ground
+        # Player is holding jump
+        if car.on_ground:
+            car.on_ground = False
+        car.air_time_since_jump = 0
+        car.is_jumping = True
+        car.is_holding_jump = True
+        car.has_jumped = True
+        car.has_flipped = False
+        car.has_double_jumped = False
+        if car.jump_time > JUMP_MAX_TIME:
+            car.jump_time = JUMP_MAX_TIME - 1 / TICKS_PER_SECOND
         jump = 1
     elif player_row.dodged:
         new_pitch = -player_row.dodge_torque_y
@@ -408,15 +481,17 @@ def _update_car_and_get_action(car: Car, linear_interpolation: bool, player_row,
         actual_torque = np.array([player_row.dodge_torque_x, player_row.dodge_torque_y, 0])
         actual_torque = actual_torque / (np.linalg.norm(actual_torque) or 1)
 
-        car.on_ground = False
+        if car.on_ground:
+            car.on_ground = False
         # car.is_flipping = True
         car.flip_torque = actual_torque
         car.has_flipped = True
-        if car.flip_time >= FLIP_TORQUE_TIME:
+        car.has_double_jumped = False
+        if car.flip_time <= 0:
+            car.flip_time = 1 / TICKS_PER_SECOND
+        elif car.flip_time >= FLIP_TORQUE_TIME:
             car.flip_time = FLIP_TORQUE_TIME - 1 / TICKS_PER_SECOND
-
         assert not car.has_flip
-
         # Pitch/yaw/roll is handled by inverse aerial control function already,
         # it knows about the flip and detects the cancel automatically
         # pitch = yaw = roll = 0
@@ -431,10 +506,27 @@ def _update_car_and_get_action(car: Car, linear_interpolation: bool, player_row,
             roll = roll * limiter
             yaw = yaw * limiter
         jump = 1
+        assert car.has_flip
+    elif player_row.double_jump_is_active:
+        if car.on_ground:
+            car.on_ground = False
+        car.has_double_jumped = True
+        car.has_flipped = False
+        assert not car.has_flip
     elif player_row.flip_car_is_active and not car.is_autoflipping:
-        # I think this is autoflip?
-        car.on_ground = False
+        # I think flip_car is autoflip?
+        if car.on_ground:
+            car.on_ground = False
         jump = 1
+
+    if car.on_ground:
+        car.air_time_since_jump = 0
+        # car.jump_time = 0  # Not reset for whatever reason, might be in the future
+        car.flip_time = 0
+        car.has_flipped = False
+        car.has_jumped = False
+        car.has_double_jumped = False
+
     if hit and car.ball_touches == 0:
         car.ball_touches = 1
     boost = player_row.boost_is_active
@@ -442,7 +534,7 @@ def _update_car_and_get_action(car: Car, linear_interpolation: bool, player_row,
     action = np.array([throttle, steer, pitch, yaw, roll, jump, boost, handbrake],
                       dtype=np.float32)
     if calculate_error:
-        return action, error_pos, error_quat, error_vel, error_ang_vel
+        return action, error_pos, error_quat, error_vel, error_ang_vel, error_car_state
     return action
 
 
@@ -463,7 +555,7 @@ def _multi_aerial_inputs(quats, ang_vels, times, is_flipping):
 
 
 def pyr_from_dataframe(game_df, player_df):
-    is_repeated = player_df["is_repeat"].values == 1
+    is_repeated = player_df["is_repeat"].values
     times = game_df["time"].values.astype(np.float32)
     ang_vels = player_df[['ang_vel_x', 'ang_vel_y', 'ang_vel_z']].values.astype(np.float32)
     quats = player_df[['quat_w', 'quat_x', 'quat_y', 'quat_z']].values.astype(np.float32)

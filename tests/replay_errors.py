@@ -1,14 +1,12 @@
-import functools
 import glob
+import os.path
 import random
-import time
+import warnings
 
-import matplotlib.pyplot as plt
 import numpy as np
 from rlgym.rocket_league.api import Car
 
 from rlgym_tools.rocket_league.action_parsers.advanced_lookup_table_action import AdvancedLookupTableAction
-from rlgym_tools.rocket_league.misc.action import Action
 from rlgym_tools.rocket_league.replays.convert import replay_to_rlgym
 from rlgym_tools.rocket_league.replays.parsed_replay import ParsedReplay
 from rlgym_tools.rocket_league.replays.pick_action import get_weighted_action_options, get_best_action_options
@@ -27,10 +25,13 @@ def main():
     # paths = glob.glob(r"./test_replays/2e786f1b-d3a1-4e51-9e7a-b45e80b10abb.replay")
     # paths = glob.glob(r"./test_replays/1168d253-8deb-4454-afba-cb6b09d7b3fc.replay")
     # paths = glob.glob(r"./test_replays/6414a7ae-0e30-4e0d-8fe6-6769ec540852.replay")
-    paths = glob.glob(r"./test_replays/36d77ff2-49b8-42e8-9012-c238f0295e31.replay")
+    # paths = glob.glob(r"./test_replays/36d77ff2-49b8-42e8-9012-c238f0295e31.replay")
     # paths = glob.glob(r"./test_replays/bb772d09-5d6f-4174-8d57-b0f6853e1638.replay")
+    paths = glob.glob(r"./test_replays/suite/*.replay")
+    # paths = glob.glob(r"E:/rokutleg/replays/assorted/**/*.replay", recursive=True)
     assert paths, "No replays found"
-    random.shuffle(paths)
+    # random.shuffle(paths)
+    paths = sorted(paths)
     forfeits = {}
     # vortex_lut = AdvancedLookupTableAction.make_lookup_table(torque_bins=5,
     #                                                            flip_bins=16, include_stalls=True)
@@ -67,25 +68,43 @@ def main():
         "Torque",
     ]
 
-    for path in paths:
-        print(path)
+    random.seed(0)
+    np.random.seed(0)
 
-        replay = ParsedReplay.load(path)
-        for lut_name, lut in zip(table_names, tables):
-            for method in methods:
-                if method is None:
-                    if not (lut is tables[0]):
-                        continue  # Only do None once (lookup table is ignored)
-                    modify_action = None
+    cached_replays = {}  # So we don't have to reload the same replay multiple times
+
+    for lut_name, lut in zip(table_names, tables):
+        for method in methods:
+            if method is None:
+                if not (lut is tables[0]):
+                    continue  # Only do None once (lookup table is ignored)
+                modify_action = None
+            else:
+                def modify_action(car: Car, action: np.ndarray):
+                    probs = method(car, action, lut)
+                    idx = np.random.choice(len(probs), p=probs)
+                    return lut[idx]
+            all_errors = {}
+            for path in paths:
+                # print(path)
+
+                if path in cached_replays:
+                    replay = cached_replays[path]
                 else:
-                    def modify_action(car: Car, action: np.ndarray):
-                        probs = method(car, action, lut)
-                        idx = np.random.choice(len(probs), p=probs)
-                        return lut[idx]
+                    replay = ParsedReplay.load(path)
+                    if len(paths) < 10:
+                        cached_replays[path] = replay
+
+                update_rate = 1 / replay.game_df["delta"].median()
+                if not 25 < update_rate < 35:
+                    replay_id = os.path.basename(path).split(".")[0]
+                    warnings.warn(f"Replay {replay_id} is not close to 30Hz ({update_rate:.2f}Hz)")
+
                 total_pos_error = {}
                 total_quat_error = {}
                 total_vel_error = {}
                 total_ang_vel_error = {}
+                total_car_state_error = {}
 
                 for replay_frame, errors in replay_to_rlgym(replay, calculate_error=True,
                                                             modify_action_fn=modify_action):
@@ -99,52 +118,26 @@ def main():
                             total_quat_error.setdefault(uid, []).append(player_errors["quat"])
                             total_vel_error.setdefault(uid, []).append(player_errors["vel"])
                             total_ang_vel_error.setdefault(uid, []).append(player_errors["ang_vel"])
+                            total_car_state_error.setdefault(uid, []).append(player_errors["car_state"])
 
                         action = replay_frame.actions[uid]
-                        # print(scoreboard)
-                        # print(f"{uid}, {car.on_ground=}, {car.boost_amount=:.2f}, {car.can_flip=}, {car.is_flipping=}")
-                        # print("replay action:\n\t" + str(Action.from_numpy(action)))
-                        #
-                        # t0 = time.perf_counter()
-                        # probs = method(car, action, vortex_lut)
-                        # t1 = time.perf_counter()
-                        # idxs = np.where(probs > 0)[0]
-                        # s = f"{method.__name__}: ({(t1 - t0) * 1000:.3f}ms)\n"
-                        # if len(idxs) > 1:
-                        #     weighted_average = np.average(vortex_lut, axis=0, weights=probs)
-                        #     s += f"WA: {Action.from_numpy(weighted_average)}\n"
-                        # for idx in sorted(idxs, key=lambda k: -probs[k]):
-                        #     a = vortex_lut[idx]
-                        #     a = Action.from_numpy(a)
-                        #     s += f"\t{a} ({probs[idx]:.0%})\n"
-                        #     print(s[:-1])
-                        # print()
-                # fig, axs = plt.subplots(nrows=4)
-                i = 0
-                print(f"Method: {method.__name__ if method is not None else 'None'}, "
-                      f"Lookup table: {lut_name}")
+
                 for name, error in [("Position", total_pos_error), ("Quaternion", total_quat_error),
-                                    ("Velocity", total_vel_error), ("Angular velocity", total_ang_vel_error)]:
+                                    ("Velocity", total_vel_error), ("Angular velocity", total_ang_vel_error),
+                                    ("Car state", total_car_state_error)]:
                     for uid, errors in error.items():
                         error[uid] = np.array(errors)
-                        # axs[i].plot(error[uid], label=uid)
-                    all_errors = np.concatenate(list(error.values()))
+                        all_errors.setdefault(name, []).extend(errors)
 
-                    print(f"{name} error: \n"
-                          f"\tMean: {np.mean(all_errors):.6g}\n"
-                          f"\tStd: {np.std(all_errors):.6g}\n"
-                          f"\tMedian: {np.median(all_errors):.6g}\n"
-                          f"\tMax: {np.max(all_errors):.6g}")
-                    # print(f"{name} error:")
-                    # print("\n".join([str(np.mean(all_errors)), str(np.std(all_errors)),
-                    #                  str(np.median(all_errors)), str(np.max(all_errors))]))
-                    # axs[i].hist(all_errors, bins=100)
-                    # axs[i].set_yscale("log")
-                    # axs[i].set_title(name)
-                    i += 1
-                print()
-                # fig.legend()
-                # plt.show()
+            print(f"Method: {method.__name__ if method is not None else 'None'}, "
+                  f"Lookup table: {lut_name}")
+            for name, errors in all_errors.items():
+                print(f"{name} error: \n"
+                      f"\tMean: {np.mean(errors):.6g}\n"
+                      f"\tStd: {np.std(errors):.6g}\n"
+                      f"\tMedian: {np.median(errors):.6g}\n"
+                      f"\tMax: {np.max(errors):.6g}")
+            print()
 
 
 if __name__ == '__main__':

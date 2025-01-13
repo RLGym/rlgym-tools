@@ -3,6 +3,7 @@ import random
 import time
 
 import matplotlib.pyplot as plt
+import pandas as pd
 from rlgym.rocket_league.common_values import TICKS_PER_SECOND
 
 from rlgym_tools.rocket_league.action_parsers.advanced_lookup_table_action import AdvancedLookupTableAction
@@ -41,6 +42,7 @@ def main():
         flip_reset_reward = FlipResetReward()
         t = 0
         t0 = time.time()
+        datas = {}
         for replay_frame in replay_to_rlgym(replay, calculate_error=False):
             if t == 0:
                 flip_reset_reward.reset(list(replay_frame.state.cars.keys()), replay_frame.state, {})
@@ -53,9 +55,31 @@ def main():
             if any(reward > 0 for reward in rewards.values()):
                 print(f"Flip reset! {rewards}")
 
+            print(replay_frame.scoreboard)
             parsed_actions = {}
             for agent_id, car in replay_frame.state.cars.items():
                 action = replay_frame.actions[agent_id]
+
+                data = datas.setdefault(agent_id, {})
+                data.setdefault("pos_x", []).append(car.physics.position[0])
+                data.setdefault("pos_y", []).append(car.physics.position[1])
+                data.setdefault("pos_z", []).append(car.physics.position[2])
+                data.setdefault("vel_x", []).append(car.physics.linear_velocity[0])
+                data.setdefault("vel_y", []).append(car.physics.linear_velocity[1])
+                data.setdefault("vel_z", []).append(car.physics.linear_velocity[2])
+                data.setdefault("on_ground", []).append(car.on_ground)
+                data.setdefault("boost_active_time", []).append(car.boost_active_time)
+                data.setdefault("air_time_since_jump", []).append(car.air_time_since_jump)
+                data.setdefault("jump_time", []).append(car.jump_time)
+                data.setdefault("flip_time", []).append(car.flip_time)
+                data.setdefault("is_jumping", []).append(car.is_jumping)
+                data.setdefault("has_jumped", []).append(car.has_jumped)
+                data.setdefault("is_holding_jump", []).append(car.is_holding_jump)
+                data.setdefault("has_flipped", []).append(car.has_flipped)
+                data.setdefault("has_double_jumped", []).append(car.has_double_jumped)
+
+                # if agent_id == next(iter(replay_frame.state.cars.keys())):
+                #     print(agent_id, car)
 
                 # For debugging:
                 # probs0 = get_simple_action_options(car, action, lookup_table)
@@ -75,6 +99,10 @@ def main():
             t = replay_frame.state.tick_count
             # if t < TICKS_PER_SECOND * 60:
             #     print(next(iter(replay_frame.state.cars.values())).physics.position)
+        datas = {
+            uid: pd.DataFrame(data)
+            for uid, data in datas.items()
+        }
         print("Game over!", replay_frame.scoreboard)
         if not replay_frame.scoreboard.is_over:
             forfeits.setdefault(len(replay_frame.state.cars), []).append(
