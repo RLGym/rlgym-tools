@@ -5,7 +5,8 @@ from typing import Literal, Callable, Iterable
 import numpy as np
 from rlgym.rocket_league.api import GameState, Car
 from rlgym.rocket_league.common_values import ORANGE_TEAM, BLUE_TEAM, TICKS_PER_SECOND, DOUBLEJUMP_MAX_DELAY, \
-    FLIP_TORQUE_TIME, JUMP_MAX_TIME, CAR_MAX_SPEED
+    FLIP_TORQUE_TIME, JUMP_MAX_TIME, CAR_MAX_SPEED, BOOST_LOCATIONS, SMALL_PAD_RECHARGE_SECONDS, \
+    BIG_PAD_RECHARGE_SECONDS
 from rlgym.rocket_league.math import quat_to_rot_mtx
 from rlgym.rocket_league.sim import RocketSimEngine
 from rlgym.rocket_league.state_mutators import FixedTeamSizeMutator, KickoffMutator
@@ -28,6 +29,8 @@ except ImportError:
 
     def optional_njit(f, *args, **kwargs):
         return f
+
+_boost_locations = np.array(BOOST_LOCATIONS)
 
 
 def replay_to_rlgym(
@@ -184,20 +187,12 @@ def replay_to_rlgym(
                 hit = (frame, uid) in hits
 
                 if calculate_error:  # and i > 0 and not player_rows[player_ids.index(uid)][i - 1].is_repeat:
-                    action, error_pos, error_quat, error_vel, error_ang_vel, error_car_state \
-                        = _update_car_and_get_action(car, linear_interpolation, player_row, state,
-                                                     calculate_error=True, hit=hit)
+                    action, errs = _update_car_and_get_action(car, linear_interpolation, player_row, state,
+                                                              calculate_error=True, hit=hit)
                     if (frame != start_frame  # Need to set the initial state first
                             and frame != goal_frame  # Goals can send players flying
-                            and not np.isnan(error_pos)  # It returns nan during repeat frames
                             and not car.is_demoed):  # Demoed cars just retain their physics from before the demo
-                        errors[uid] = {
-                            "pos": error_pos,
-                            "quat": error_quat,
-                            "vel": error_vel,
-                            "ang_vel": error_ang_vel,
-                            "car_state": error_car_state,
-                        }
+                        errors[uid] = errs
                 else:
                     action = _update_car_and_get_action(car, linear_interpolation, player_row, state, hit=hit)
 
@@ -207,8 +202,8 @@ def replay_to_rlgym(
                 actions[uid] = action
                 update_age[uid] = player_row.update_age if not player_row.is_demoed else 0
 
-            # Now detect demos so bump victims are correctly set
             for uid, player_row in zip(player_ids, car_rows):
+                # Detect demos so bump victims are correctly set
                 if player_row.got_demoed:
                     closest = None
                     for uid2 in player_ids:
@@ -223,6 +218,16 @@ def replay_to_rlgym(
                     else:
                         if closest[1] < 200 + 2 * CAR_MAX_SPEED * average_tick_rate / TICKS_PER_SECOND:
                             state.cars[closest[0]].bump_victim_id = uid
+
+                # Detect boost grabs
+                if player_row.boost_pickup > 0:
+                    pad_dists = np.linalg.norm(_boost_locations - state.cars[uid].physics.position, axis=1)
+                    closest_pad_idx = np.argmin(pad_dists)
+                    if pad_dists[closest_pad_idx] < 200 and state.boost_pad_timers[closest_pad_idx] == 0:
+                        if _boost_locations[closest_pad_idx, 1] > 71.5:
+                            state.boost_pad_timers[closest_pad_idx] = BIG_PAD_RECHARGE_SECONDS
+                        else:
+                            state.boost_pad_timers[closest_pad_idx] = SMALL_PAD_RECHARGE_SECONDS
 
             if state.goal_scored:
                 if state.scoring_team == BLUE_TEAM:
@@ -266,7 +271,8 @@ def replay_to_rlgym(
             ticks = step_rounding(game_tuples[i + 1].time * TICKS_PER_SECOND - state.tick_count)
             for uid, action in actions.items():
                 repeated_action = action.reshape(1, -1).repeat(ticks, axis=0)
-                # repeated_action[:ticks // 2, :] = prev_actions[uid]
+                # if ticks > 1:
+                #     repeated_action[:1, :] = prev_actions[uid]  # Simulate rlbot_delay
                 # prev_actions[uid] = action  # Keep the unrepeated action for the next frame
                 actions[uid] = repeated_action
 
@@ -304,7 +310,7 @@ def _prepare_segment_dfs(replay, start_frame, end_frame, linear_interpolation, p
         is_repeat &= (is_repeat.rolling(4).sum() < 4)
 
         # Physics info is nan while the player is demoed
-        is_demoed = pdf["pos_x"].isna()
+        is_demoed = pdf[["is_sleeping"] + physics_cols].isna().any(axis=1)
 
         # Interpolate, smooth, and shift (essentially shift by -0.5)
         pdf[["throttle", "steer"]] = pdf[["throttle", "steer"]].ffill().fillna(255 / 2)
@@ -319,6 +325,20 @@ def _prepare_segment_dfs(replay, start_frame, end_frame, linear_interpolation, p
         pdf["got_demoed"] = pdf["is_demoed"].diff() > 0
         pdf["respawned"] = pdf["is_demoed"].diff() < 0
 
+        # Demos while flipping make dodge_is_active stay true until they respawn and flip again
+        # For these cases we need to find the next frame where dodge torque changes, which is when they flip again,
+        # and fill the dodge_is_active column with 0 until then
+        dodge_active_on_respawn = (pdf["dodge_is_active"] == 1) & pdf["respawned"]
+        if dodge_active_on_respawn.any():
+            torque_change = (pdf["dodge_torque_x"].diff() != 0) | (pdf["dodge_torque_y"].diff() != 0)
+            start_idx = dodge_active_on_respawn[dodge_active_on_respawn].index
+            end_idx = torque_change[torque_change].index
+            for i in range(len(start_idx)):
+                for j in range(len(end_idx)):
+                    if end_idx[j] > start_idx[i]:
+                        pdf.loc[start_idx[i]:end_idx[j] - 1, "dodge_is_active"] = 0
+                        break
+
         # We need to make sure we do some actions 1 frame before so they're active when they're supposed to be
         # We treat jump and dodge differently on first frame since the requirements are different
         pdf["jumped"] = (pdf["jump_is_active"].diff() > 0).shift(-1, fill_value=False)
@@ -329,6 +349,12 @@ def _prepare_segment_dfs(replay, start_frame, end_frame, linear_interpolation, p
         pdf.loc[boosted, "boost_is_active"] = 1
         flipped_car = (pdf["flip_car_is_active"].diff() > 0).shift(-1, fill_value=False)
         pdf.loc[flipped_car, "flip_car_is_active"] = 1
+
+        # Make sure jump isn't active right before a dodge or double jump
+        m = (((pdf["dodge_is_active"].shift(-2, fill_value=0) == 1)
+              | (pdf["double_jump_is_active"].shift(-2, fill_value=0) == 1))
+             & (pdf["jump_is_active"] == 1))
+        pdf.loc[m, "jump_is_active"] = 0
 
         times = game_df["time"].copy()
         times[is_repeat] = np.nan
@@ -389,37 +415,25 @@ def _prepare_segment_dfs(replay, start_frame, end_frame, linear_interpolation, p
 
 def _update_car_and_get_action(car: Car, linear_interpolation: bool, player_row, state: GameState,
                                calculate_error=False, hit: bool = False):
-    error_pos = error_quat = error_vel = error_ang_vel = error_car_state = np.nan
-    if linear_interpolation or not player_row.is_repeat:
+    pre_car = deepcopy(car) if calculate_error else None
+    replay_update = not player_row.is_repeat
+    if linear_interpolation or replay_update:
         true_pos = (player_row.pos_x, player_row.pos_y, player_row.pos_z)
         true_vel = (player_row.vel_x, player_row.vel_y, player_row.vel_z)
         true_ang_vel = (player_row.ang_vel_x, player_row.ang_vel_y, player_row.ang_vel_z)
         true_quat = (player_row.quat_w, player_row.quat_x, player_row.quat_y, player_row.quat_z)
 
-        if calculate_error and not (player_row.respawned or (player_row.is_demoed and not player_row.got_demoed)):
-            error_pos = np.linalg.norm(car.physics.position - np.array(true_pos))
-            error_quat = min(np.linalg.norm(car.physics.quaternion - np.array(true_quat)),
-                             np.linalg.norm(car.physics.quaternion + np.array(true_quat)))
-            error_vel = np.linalg.norm(car.physics.linear_velocity - np.array(true_vel))
-            error_ang_vel = np.linalg.norm(car.physics.angular_velocity - np.array(true_ang_vel))
-            error_car_state = sum((  # Directly known information about the car from the replay
-                car.is_demoed != player_row.is_demoed,
-                abs(car.boost_amount - player_row.boost_amount) / 100,
-                car.is_jumping != player_row.jump_is_active,
-                car.is_flipping != player_row.dodge_is_active,
-            ))
-
-        if player_row.got_demoed and not car.is_demoed:
-            car.demo_respawn_timer = 3
-        elif player_row.is_demoed and not car.is_demoed:
-            car.demo_respawn_timer = 1 / TICKS_PER_SECOND
-        elif not player_row.is_demoed and car.is_demoed:
-            car.demo_respawn_timer = 0
-
         car.physics.position[:] = true_pos
         car.physics.linear_velocity[:] = true_vel
         car.physics.angular_velocity[:] = true_ang_vel
         car.physics.quaternion = np.array(true_quat)  # Uses property setter
+
+    if player_row.got_demoed and not car.is_demoed:
+        car.demo_respawn_timer = 3
+    elif player_row.is_demoed and not car.is_demoed:
+        car.demo_respawn_timer = 1 / TICKS_PER_SECOND
+    elif not player_row.is_demoed and car.is_demoed:
+        car.demo_respawn_timer = 0
 
     car.boost_amount = player_row.boost_amount
     throttle = 2 * player_row.throttle / 255 - 1
@@ -533,8 +547,40 @@ def _update_car_and_get_action(car: Car, linear_interpolation: bool, player_row,
     handbrake = player_row.handbrake
     action = np.array([throttle, steer, pitch, yaw, roll, jump, boost, handbrake],
                       dtype=np.float32)
+
     if calculate_error:
-        return action, error_pos, error_quat, error_vel, error_ang_vel, error_car_state
+        errors = {}
+        if pre_car is not None:
+            if replay_update and not (player_row.respawned or (player_row.is_demoed and not player_row.got_demoed)):
+                # During demos the physics state isn't really valid, and they can respawn on either side
+                for slot in car.physics.__slots__:  # position, linear_velocity, etc.
+                    if slot.startswith("_"):
+                        continue
+                    old_val = getattr(pre_car.physics, slot)
+                    new_val = getattr(car.physics, slot)
+                    errors[slot] = np.linalg.norm(new_val - old_val)
+                # Quaternions have two valid representations, so we need to check both
+                new_val = car.physics.quaternion
+                old_val = pre_car.physics.quaternion
+                errors["quaternion"] = 1 - np.dot(new_val, old_val) ** 2
+
+            for slot in car.__slots__:
+                if slot == "physics" or slot.startswith("_"):
+                    continue
+                new_val = getattr(car, slot)
+                old_val = getattr(pre_car, slot)
+                if isinstance(new_val, np.ndarray):
+                    if slot == "flip_torque" and not player_row.dodge_is_active:
+                        # We shifted the torque so we could use it to get the correct action,
+                        # but the state won't update until next frame
+                        continue
+                    errors[slot] = np.linalg.norm(new_val - old_val)
+                elif isinstance(new_val, (float, int, bool)):
+                    errors[slot] = abs(new_val - old_val)
+                else:
+                    errors[slot] = new_val != old_val
+        return action, errors
+
     return action
 
 

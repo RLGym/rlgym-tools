@@ -100,11 +100,7 @@ def main():
                     replay_id = os.path.basename(path).split(".")[0]
                     warnings.warn(f"Replay {replay_id} is not close to 30Hz ({update_rate:.2f}Hz)")
 
-                total_pos_error = {}
-                total_quat_error = {}
-                total_vel_error = {}
-                total_ang_vel_error = {}
-                total_car_state_error = {}
+                total_errors = {}
 
                 for replay_frame, errors in replay_to_rlgym(replay, calculate_error=True,
                                                             modify_action_fn=modify_action):
@@ -114,29 +110,27 @@ def main():
                         if uid in errors:
                             player_errors = errors[uid]
 
-                            total_pos_error.setdefault(uid, []).append(player_errors["pos"])
-                            total_quat_error.setdefault(uid, []).append(player_errors["quat"])
-                            total_vel_error.setdefault(uid, []).append(player_errors["vel"])
-                            total_ang_vel_error.setdefault(uid, []).append(player_errors["ang_vel"])
-                            total_car_state_error.setdefault(uid, []).append(player_errors["car_state"])
+                            terr = total_errors.setdefault(uid, {})
+                            for key in player_errors.keys():
+                                value = player_errors.get(key, np.nan)
+                                terr.setdefault(key, []).append(value)
+                            for key in set(terr.keys()) - set(player_errors.keys()):
+                                terr[key].append(np.nan)
 
                         action = replay_frame.actions[uid]
 
-                for name, error in [("Position", total_pos_error), ("Quaternion", total_quat_error),
-                                    ("Velocity", total_vel_error), ("Angular velocity", total_ang_vel_error),
-                                    ("Car state", total_car_state_error)]:
-                    for uid, errors in error.items():
-                        error[uid] = np.array(errors)
+                for uid, error in total_errors.items():
+                    for name, errors in error.items():
                         all_errors.setdefault(name, []).extend(errors)
 
             print(f"Method: {method.__name__ if method is not None else 'None'}, "
                   f"Lookup table: {lut_name}")
             for name, errors in all_errors.items():
                 print(f"{name} error: \n"
-                      f"\tMean: {np.mean(errors):.6g}\n"
-                      f"\tStd: {np.std(errors):.6g}\n"
-                      f"\tMedian: {np.median(errors):.6g}\n"
-                      f"\tMax: {np.max(errors):.6g}")
+                      f"\tMean: {np.nanmean(errors):.6g}\n"
+                      f"\tStd: {np.nanstd(errors):.6g}\n"
+                      f"\tMedian: {np.nanmedian(errors):.6g}\n"
+                      f"\tMax: {np.nanmax(errors):.6g}")
             print()
 
 
