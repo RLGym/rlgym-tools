@@ -1,5 +1,5 @@
 # rlgym-tools
-Extra tools for use with the [RLGym](https://github.com/lucas-emery/RLGym) library.
+Extra tools for use with the [RLGym](https://github.com/lucas-emery/rocket-league-gym) library.
 
 Contains many options for the RLGym configuration objects:
 - Action parsers
