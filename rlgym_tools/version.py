@@ -5,10 +5,13 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.1.0'
+__version__ = '2.1.1'
 
 
 release_notes = {
+    '2.1.1': """
+    - Improve accuracy of the replay to RLGym converter
+    """,
     '2.1.0': """
     - Add reward reporting tools for inspecting rewards with replays
     - Add some convenience methods to the Action dataclass
