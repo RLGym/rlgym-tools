@@ -17,6 +17,10 @@ class RandomScoreboardMutator(StateMutator[GameState]):
         if scoreboard is None:
             scoreboard = ScoreboardInfo(300, 0, 0, 0, False, False)
             shared_info["scoreboard"] = scoreboard
+        else:
+            # Indicate that we've set the scoreboard to an initial state
+            scoreboard.go_to_kickoff = False
+            scoreboard.is_over = False
 
         num_cars = len(state.cars)
         ael = AVERAGE_EPISODE_LENGTH[num_cars // 2 - 1]  # Average episode length for this gamemode
