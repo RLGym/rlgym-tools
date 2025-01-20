@@ -22,6 +22,7 @@ class DelayedAction(ActionParser[AgentID, np.ndarray, np.ndarray, GameState, Tup
     def reset(self, agents: List[AgentID], initial_state: StateType, shared_info: Dict[str, Any]) -> None:
         self.action_parser.reset(agents, initial_state, shared_info)
         self.delayed_actions = {agent: np.zeros((self.delay_ticks, 8)) for agent in agents}
+        shared_info["delayed_actions"] = self.delayed_actions
 
     def parse_actions(self, actions: Dict[AgentID, ActionType], state: StateType, shared_info: Dict[str, Any]) \
             -> Dict[AgentID, EngineActionType]:
