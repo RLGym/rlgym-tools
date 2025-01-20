@@ -7,8 +7,9 @@ from rlgym.rocket_league.api import GameState
 
 class DelayedAction(ActionParser[AgentID, np.ndarray, np.ndarray, GameState, Tuple[AgentID, np.ndarray]]):
     """
-    DelayedAction delays all actions by a specified number of ticks. The last tick(s) of the previous action are
-    prepended to the current action. RLBot has a 1-tick delay so this is essential for full reproducibility.
+    DelayedAction delays all actions by a specified number of ticks.
+    The queue is put into the shared_info dictionary under the key "delayed_actions".
+    The index of the queue indicates the number of ticks until the action is executed.
     """
 
     def __init__(self, action_parser: ActionParser, delay_ticks: int = 1):
@@ -31,9 +32,14 @@ class DelayedAction(ActionParser[AgentID, np.ndarray, np.ndarray, GameState, Tup
         for agent, action in parsed_actions.items():
             del_action = self.delayed_actions[agent]
             ret_action = np.zeros_like(action)
-            ret_action[:self.delay_ticks] = del_action
-            ret_action[self.delay_ticks:] = action[:-self.delay_ticks]
-            del_action[:] = action[-self.delay_ticks:]
+            if len(action) <= self.delay_ticks:
+                ret_action[:] = del_action[:len(action)]  # Copy next actions from queue
+                del_action[:-len(action)] = del_action[len(action):]  # Shift queue
+                del_action[-len(action):] = action  # Add new actions
+            else:
+                ret_action[:self.delay_ticks] = del_action  # Copy next actions from queue
+                ret_action[self.delay_ticks:] = action[:-self.delay_ticks]  # Copy subsequent actions from current
+                del_action[:] = action[-self.delay_ticks:]  # Add new actions to queue
             returned_actions[agent] = ret_action
         shared_info["delayed_actions"] = self.delayed_actions
         return returned_actions
