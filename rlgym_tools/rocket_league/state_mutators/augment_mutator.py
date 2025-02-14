@@ -1,4 +1,5 @@
 import random
+from copy import deepcopy
 from typing import Dict, Any
 
 import numpy as np
@@ -57,12 +58,14 @@ class AugmentMutator(StateMutator[GameState]):
 
     @staticmethod
     def swap_front_back(state):  # Across x-axis, meaning y-axis is inverted
+        state.ball = deepcopy(state.ball)  # Circumvents a bug in KickoffMutator in base library
         state.ball.position[1] *= -1
         state.ball.linear_velocity[1] *= -1
         state.ball.angular_velocity[0] *= -1
         state.ball.angular_velocity[2] *= -1
         for car in state.cars.values():
             car.team_num = BLUE_TEAM if car.is_orange else ORANGE_TEAM
+            car.physics = deepcopy(car.physics)  # Circumvents a bug in KickoffMutator in base library
             car.physics.position[1] *= -1
             car.physics.linear_velocity[1] *= -1
             car.physics.angular_velocity[0] *= -1
@@ -80,11 +83,13 @@ class AugmentMutator(StateMutator[GameState]):
 
     @staticmethod
     def swap_left_right(state):  # Across y-axis, meaning x-axis is inverted
+        state.ball = deepcopy(state.ball)  # Circumvents a bug in KickoffMutator in base library
         state.ball.position[0] *= -1
         state.ball.linear_velocity[0] *= -1
         state.ball.angular_velocity[1] *= -1
         state.ball.angular_velocity[2] *= -1
         for car in state.cars.values():
+            car.physics = deepcopy(car.physics)  # Circumvents a bug in KickoffMutator in base library
             car.physics.position[0] *= -1
             car.physics.linear_velocity[0] *= -1
             car.physics.angular_velocity[1] *= -1

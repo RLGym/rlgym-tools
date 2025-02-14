@@ -5,10 +5,18 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.1.1'
+__version__ = '2.1.2'
 
 
 release_notes = {
+    '2.1.2': """
+    - Fix activation function in BoostKeepReward
+    - Add checks to RandomPhysicsMutator to make sure we place cars and ball inside the field.
+    - Use copying in AugmentMutator to circumvent a bug in base RLGym library when using KickoffMutator
+    - Fix DelayedAction for delays longer than action length
+    - Set delayed_actions in shared_info on reset in DelayedAction
+    - Set go_to_kickoff and is_over in RandomScoreboardMutator
+    """,
     '2.1.1': """
     - Improve accuracy of the replay to RLGym converter
     """,
