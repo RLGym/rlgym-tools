@@ -7,7 +7,8 @@ from rlgym.rocket_league.common_values import TICKS_PER_SECOND
 
 
 class BoostKeepReward(RewardFunction[AgentID, GameState, float]):
-    def __init__(self, reward_per_second: float = 1.0, activation_fn: Callable[[float], float] = math.sqrt):
+    def __init__(self, reward_per_second: float = 1.0,
+                 activation_fn: Callable[[float], float] = lambda x: math.sqrt(0.01 * x)):
         """
         Reward function that rewards agents for having boost in their tank.
 
