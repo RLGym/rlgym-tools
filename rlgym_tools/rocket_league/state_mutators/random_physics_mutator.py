@@ -33,5 +33,5 @@ class RandomPhysicsMutator(StateMutator[GameState]):
             po.angular_velocity = rand_vec3(5)
             fw = rand_uvec3()
             up = rand_uvec3()
-            right = np.cross(fw, up)
+            right = np.cross(up, fw)  # Technically not correct but testing shows that this is what's used
             po.rotation_mtx = np.stack([fw, right, up])
