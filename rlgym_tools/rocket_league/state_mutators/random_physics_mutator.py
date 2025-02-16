@@ -18,7 +18,7 @@ class RandomPhysicsMutator(StateMutator[GameState]):
                                             [SIDE_WALL_X - padding, BACK_WALL_Y - padding, CEILING_Z - padding])
 
                 # Some checks to make sure we don't place it outside the field
-                if abs(new_pos[0]) + abs(new_pos) >= 8064 - padding:
+                if abs(new_pos[0]) + abs(new_pos[1]) >= 8064 - padding:
                     continue
                 close_to_wall = (abs(new_pos[0]) >= SIDE_WALL_X - RAMP_HEIGHT
                                  or abs(new_pos[1]) >= BACK_WALL_Y - RAMP_HEIGHT

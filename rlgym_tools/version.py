@@ -5,10 +5,13 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.2.0'
+__version__ = '2.2.1'
 
 
 release_notes = {
+    '2.2.1': """
+    - Fix error in RandomPhysicsMutator
+    """,
     '2.2.0': """
     - Add V1 objects and V2 to V1 conversion functions.
     """,
