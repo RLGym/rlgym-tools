@@ -5,10 +5,13 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.2.2'
+__version__ = '2.2.3'
 
 
 release_notes = {
+    '2.2.3': """
+    - Fix pitch and yaw on dodges by normalizing torque in replay converter.
+    """,
     '2.2.2': """
     - Fix RandomPhysicsMutator giving invalid rotation and disabling ball collision.
     """,

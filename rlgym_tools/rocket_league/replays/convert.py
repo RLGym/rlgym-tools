@@ -477,8 +477,8 @@ def _update_car_and_get_action(car: Car, linear_interpolation: bool, player_row,
             car.jump_time = JUMP_MAX_TIME - 1 / TICKS_PER_SECOND
         jump = 1
     elif player_row.dodged:
-        new_pitch = -player_row.dodge_torque_y
-        new_roll = -player_row.dodge_torque_x
+        new_pitch = -player_row.dodge_torque_y / 2.24
+        new_roll = -player_row.dodge_torque_x / 2.6
         mx = max(abs(new_pitch), abs(new_roll))
         if mx > 0:
             # Project to unit square because why not
