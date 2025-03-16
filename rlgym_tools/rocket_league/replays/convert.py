@@ -492,7 +492,7 @@ def _update_car_and_get_action(car: Car, linear_interpolation: bool, player_row,
             pitch = 0
         jump = 1
     elif player_row.dodge_is_active:
-        actual_torque = np.array([player_row.dodge_torque_x, player_row.dodge_torque_y, 0])
+        actual_torque = np.array([player_row.dodge_torque_x / 2.6, player_row.dodge_torque_y / 2.24, 0])
         actual_torque = actual_torque / (np.linalg.norm(actual_torque) or 1)
 
         if car.on_ground:
