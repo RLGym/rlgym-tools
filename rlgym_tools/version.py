@@ -5,10 +5,13 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.2.4'
+__version__ = '2.2.5'
 
 
 release_notes = {
+    '2.2.5': """
+    - Add new carball.exe
+    """,
     '2.2.4': """
     - Fix dodge torque adjustment by normalizing torque in replay converter.
     """,
