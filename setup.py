@@ -17,7 +17,7 @@ setup(
     url='https://rlgym.github.io',
     install_requires=[
         'rlgym>=2.0.0',
-        'rlgym-rocket-league[sim]>=2.0.0'  # Remove if we ever add other envs
+        'rlgym-rocket-league[sim]>=2.0.1'  # Remove if we ever add other envs
     ],
     python_requires='>=3.7',
     license='Apache 2.0',

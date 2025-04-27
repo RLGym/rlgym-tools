@@ -27,8 +27,9 @@ class DemoReward(RewardFunction[AgentID, GameState, float]):
             if victim is not None:
                 victim_car = state.cars[victim]
                 if victim_car.is_demoed:
-                    rewards[agent] += self.attacker_reward
-                    rewards[victim] -= self.victim_punishment
+                    if not self.prev_state.cars[victim].is_demoed:
+                        rewards[agent] += self.attacker_reward
+                        rewards[victim] -= self.victim_punishment
                 else:
                     acceleration = np.linalg.norm(state.cars[victim].physics.linear_velocity
                                                   - self.prev_state.cars[victim].physics.linear_velocity)

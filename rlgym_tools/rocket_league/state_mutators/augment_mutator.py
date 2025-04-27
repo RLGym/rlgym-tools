@@ -79,6 +79,8 @@ class AugmentMutator(StateMutator[GameState]):
             car.physics.rotation_mtx = rot_mtx
             wwc = car.wheels_with_contact
             car.wheels_with_contact = wwc[1], wwc[0], wwc[3], wwc[0]  # Swap wheels
+            car.flip_torque[0] *= -1  # Roll torque
+            car.autoflip_direction *= -1
         state.boost_pad_timers[:] = state.boost_pad_timers[_front_back_pad_indices]
 
     @staticmethod
@@ -103,4 +105,6 @@ class AugmentMutator(StateMutator[GameState]):
             car.physics.rotation_mtx = rot_mtx
             wwc = car.wheels_with_contact
             car.wheels_with_contact = wwc[1], wwc[0], wwc[3], wwc[0]  # Swap wheels
+            car.flip_torque[0] *= -1  # Roll torque
+            car.autoflip_direction *= -1
         state.boost_pad_timers[:] = state.boost_pad_timers[_left_right_pad_indices]
