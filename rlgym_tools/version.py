@@ -9,13 +9,17 @@ __version__ = '2.3.0'
 
 
 release_notes = {
+    '2.3.1': """
+    - Fix flip reset obtain detection in FlipResetReward
+    """,
     '2.3.0': """
     - Update RLGym requirement to >=2.0.1
     - Add AutoRewardNormalizer,SimpleZNormalizer and SQLiteNormalizer for automatically normalizing rewards
     - Add hitboxes.py containing a Hitbox dataclass and the standard in-game hitboxes
     - Add surface.py with a Surface enum methods for getting distance to different kinds of arena surfaces
     - Fix AugmentMutator not adjusting flip torque and autoflip drection
-    - Fix DemoReward rewarding the same demo multiple times    """,
+    - Fix DemoReward rewarding the same demo multiple times
+    """,
     '2.2.5': """
     - Add new carball.exe
     """,
