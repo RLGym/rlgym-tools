@@ -5,11 +5,12 @@ from rlgym.rocket_league.api import Car
 def filter_action_options(car: Car, replay_action: np.ndarray, action_options: np.ndarray, greedy_continuous: bool,
                           deadzone: float = 0.5):
     # Filters out actions that are definitely not correct
-    margin = 1e-3
 
     candidates = action_options.copy()
 
-    jump_matters = (car.on_ground or car.can_flip) and not car.is_holding_jump
+    # Technically there's a small chance it could be wrong if it holds jump when landing and is supposed to jump the next step,
+    # but doing it like this lets it use actions meant for flips to rotate in the air, giving greater precision.
+    jump_matters = car.on_ground or car.is_jumping or car.has_flip
     boost_matters = car.boost_amount > 0
     is_grounded = car.on_ground and replay_action[5] == 0
     is_aerial = not car.on_ground and replay_action[5] == 0
@@ -51,9 +52,10 @@ def filter_action_options(car: Car, replay_action: np.ndarray, action_options: n
         candidates = candidates[handbrake_error == handbrake_error.min()]
 
         # Throttle
-        throttle = replay_action[0] if (replay_action[6] == 0 and boost_matters) else 1
+        margin = 1e-3  # Below this is regarded as 0
+        throttle = replay_action[0] if (replay_action[6] == 0 or not boost_matters) else 1
         if abs(throttle) >= margin:
-            # There is a braking effect when
+            # There is a braking effect when opposing the current velocity that does not depend on magnitude
             throttle_dir = np.sign(throttle)
             throttle_dirs = np.sign(candidates[:, 0]) * (abs(candidates[:, 0]) >= margin)
             dir_error = throttle_dirs == -throttle_dir
@@ -149,7 +151,7 @@ def get_weighted_action_options(car: Car, replay_action: np.ndarray, action_opti
         candidates = candidates[_validate_continuous(1)]  # Steer
         button_weights[[2, 3, 4]] = 1e-2  # Basically telling it to only optimize this if it has options
         button_weights[[5, 6]] = 1e-4
-    elif replay_action[5] == 0 or car.on_ground or not car.can_flip or car.is_holding_jump:
+    elif replay_action[5] == 0 or car.on_ground or not car.can_flip or car.is_holding_jump:  # Aerial or first jump
         button_weights[[0, 1, 7]] = 1e-2
         button_weights[[5, 6]] = 1e-4
         candidates = candidates[_validate_continuous(2)]  # Pitch
