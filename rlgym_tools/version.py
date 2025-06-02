@@ -5,10 +5,13 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.3.2'
+__version__ = '2.3.3'
 
 
 release_notes = {
+    '2.3.3': """
+    - Fix changing dictionary entries in ReplayFrame actions after yield.
+    """,
     '2.3.2': """
     - In pick_action.py: better logic for when jump matters, and fix for throttle logic when no boost.
     """,

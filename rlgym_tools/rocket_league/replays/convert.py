@@ -268,17 +268,14 @@ def replay_to_rlgym(
             if frame == end_frame:
                 break
 
-            ticks = step_rounding(game_tuples[i + 1].time * TICKS_PER_SECOND - state.tick_count)
-            for uid, action in actions.items():
-                repeated_action = action.reshape(1, -1).repeat(ticks, axis=0)
-                # if ticks > 1:
-                #     repeated_action[:1, :] = prev_actions[uid]  # Simulate rlbot_delay
-                # prev_actions[uid] = action  # Keep the unrepeated action for the next frame
-                actions[uid] = repeated_action
-
             if rocketsim_interpolation:
+                ticks = step_rounding(game_tuples[i + 1].time * TICKS_PER_SECOND - state.tick_count)
+                repeated_actions = {
+                    uid: action.reshape(1, -1).repeat(ticks, axis=0)
+                    for uid, action in actions.items()
+                }
                 transition_engine.set_state(state, {})
-                state = transition_engine.step(actions, {})
+                state = transition_engine.step(repeated_actions, {})
             else:
                 state = deepcopy(state)
 
