@@ -74,10 +74,10 @@ def filter_action_options(car: Car, replay_action: np.ndarray, action_options: n
         # Pitch, yaw, roll
         rotate_dir = replay_action[2:5]
         rotate_dirs = candidates[:, 2:5]
-        dir_dot = np.dot(rotate_dirs, rotate_dir)
         if greedy_continuous:
-            dir_error = -dir_dot
+            dir_error = np.linalg.norm(rotate_dirs - rotate_dir, axis=1)
         else:
+            dir_dot = np.dot(rotate_dirs, rotate_dir)
             dir_error = dir_dot < 0
         candidates = candidates[dir_error == dir_error.min()]
 
