@@ -8,19 +8,20 @@ def filter_action_options(car: Car, replay_action: np.ndarray, action_options: n
 
     candidates = action_options.copy()
 
-    # Technically there's a small chance it could be wrong if it holds jump when landing and is supposed to jump the next step,
+    # There's a tiny chance it could be wrong if it lands holding jump and is supposed to jump the next step,
     # but doing it like this lets it use actions meant for flips to rotate in the air, giving greater precision.
     jump_matters = car.on_ground or car.is_jumping or car.has_flip
     boost_matters = car.boost_amount > 0
     is_grounded = car.on_ground and replay_action[5] == 0
-    is_aerial = not car.on_ground and replay_action[5] == 0
+    is_using_dodge = replay_action[5] == 1 and car.can_flip
+    is_aerial = not is_grounded and not is_using_dodge
 
     if jump_matters:
         # Jump
         jump_error = np.abs(candidates[:, 5] - replay_action[5])
         candidates = candidates[jump_error == jump_error.min()]
 
-        if not car.on_ground and replay_action[5] == 1:
+        if is_using_dodge:
             # Check if it's a dodge or a double jump
             is_dodge = np.abs(replay_action[2:5]).sum() >= deadzone
             is_dodges = np.abs(candidates[:, 2:5]).sum(axis=1) >= deadzone  # Jump is already filtered
@@ -40,6 +41,8 @@ def filter_action_options(car: Car, replay_action: np.ndarray, action_options: n
                     dodge_dirs[m] /= np.linalg.norm(dodge_dirs[m], axis=1, keepdims=True)
                     dir_dot = np.dot(dodge_dirs, dodge_dir)
                 candidates = candidates[dir_dot == dir_dot.max()]
+            else:
+                is_aerial = True  # Optimize aerial direction for valid candidates
 
     if boost_matters:
         # Boost
@@ -68,13 +71,15 @@ def filter_action_options(car: Car, replay_action: np.ndarray, action_options: n
             steer_error = np.abs(candidates[:, 1] - replay_action[1])
             candidates = candidates[steer_error == steer_error.min()]
     elif is_aerial:  # Aerial
+        # Pitch, yaw, roll
+        rotate_dir = replay_action[2:5]
+        rotate_dirs = candidates[:, 2:5]
+        dir_dot = np.dot(rotate_dirs, rotate_dir)
         if greedy_continuous:
-            # Pitch, yaw, roll
-            rotate_dir = replay_action[2:5]
-            rotate_dirs = candidates[:, 2:5]
-
-            dir_error = np.linalg.norm(rotate_dirs - rotate_dir, axis=1)
-            candidates = candidates[dir_error == dir_error.min()]
+            dir_error = -dir_dot
+        else:
+            dir_error = dir_dot < 0
+        candidates = candidates[dir_error == dir_error.min()]
 
     # Steer (on ground) and pitch/yaw/roll (in air) are ignored due to being continuous
     return candidates
@@ -143,7 +148,11 @@ def get_weighted_action_options(car: Car, replay_action: np.ndarray, action_opti
             v = (diff == 0) | (diff == 1)
         return v
 
-    if car.on_ground and replay_action[5] == 0:
+    is_grounded = car.on_ground and replay_action[5] == 0
+    is_using_dodge = replay_action[5] == 1 and car.can_flip
+    is_aerial = not is_grounded and not is_using_dodge
+
+    if is_grounded:
         handbrake_error = np.abs(candidates[:, 7] - replay_action[7])
         candidates = candidates[handbrake_error == handbrake_error.min()]
 
@@ -151,7 +160,7 @@ def get_weighted_action_options(car: Car, replay_action: np.ndarray, action_opti
         candidates = candidates[_validate_continuous(1)]  # Steer
         button_weights[[2, 3, 4]] = 1e-2  # Basically telling it to only optimize this if it has options
         button_weights[[5, 6]] = 1e-4
-    elif replay_action[5] == 0 or car.on_ground or not car.can_flip or car.is_holding_jump:  # Aerial or first jump
+    elif is_aerial:
         button_weights[[0, 1, 7]] = 1e-2
         button_weights[[5, 6]] = 1e-4
         candidates = candidates[_validate_continuous(2)]  # Pitch
