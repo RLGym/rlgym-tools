@@ -5,10 +5,13 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.3.5'
+__version__ = '2.3.6'
 
 
 release_notes = {
+    '2.3.6': """
+    - Update carball to handle multiple bots and splitscreen players (Zealan)
+    """,
     '2.3.5': """
     - Fix bad pitch/yaw/roll error calculation in pick_action.py
     """,
