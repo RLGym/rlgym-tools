@@ -5,10 +5,14 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.3.6'
+__version__ = '2.3.7'
 
 
 release_notes = {
+    '2.3.7': """
+    - Add car_bodies.py with information about car bodies (id, name, hitbox)
+    - Use car id info in replay parsing
+    """,
     '2.3.6': """
     - Update carball to handle multiple bots and splitscreen players (Zealan)
     """,

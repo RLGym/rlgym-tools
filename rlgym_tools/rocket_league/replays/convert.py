@@ -13,6 +13,7 @@ from rlgym.rocket_league.state_mutators import FixedTeamSizeMutator, KickoffMuta
 
 from rlgym_tools.rocket_league.math.ball import ball_hit_ground
 from rlgym_tools.rocket_league.math.inverse_aerial_controls import aerial_inputs
+from rlgym_tools.rocket_league.misc.car_bodies import HITBOX_FROM_ITEM_ID
 from rlgym_tools.rocket_league.replays.parsed_replay import ParsedReplay
 from rlgym_tools.rocket_league.replays.replay_frame import ReplayFrame
 from rlgym_tools.rocket_league.shared_info_providers.scoreboard_provider import ScoreboardInfo
@@ -128,7 +129,9 @@ def replay_to_rlgym(
         new_cars = {}
         for uid, car in zip(replay.player_dfs, state.cars.values()):
             player = players[uid]
-            # car.hitbox_type = OCTANE  # TODO: Get hitbox from replay
+            hitbox = HITBOX_FROM_ITEM_ID.get(player.get("car_id"))
+            if hitbox is not None:
+                car.hitbox_type = hitbox
             car.team_num = ORANGE_TEAM if player["is_orange"] else BLUE_TEAM
             new_cars[int(uid)] = car
         state.cars = new_cars
