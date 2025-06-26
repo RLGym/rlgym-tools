@@ -75,7 +75,8 @@ def serialize_game_state(game_state: GameState, aid_to_num=None) -> np.ndarray:
     s[GS_CONFIG] = serialize_config(game_state.config)
     s[GS_BALL] = serialize_physics_object(game_state.ball)
     s[GS_BOOST_PAD_TIMERS] = game_state.boost_pad_timers
-    for i, (aid, car) in enumerate(game_state.cars.items()):
+    for i, aid in enumerate(aid_to_num):
+        car = game_state.cars[aid]
         start = GS_CARS.start + i * GS_CAR_LENGTH
         end = start + GS_CAR_LENGTH
         s[start] = aid_to_num[aid]

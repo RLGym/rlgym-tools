@@ -5,10 +5,9 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict
+import platform
 
 import pandas as pd
-
-CARBALL_COMMAND = '{} -i "{}" -o "{}" parquet'
 
 ENV = os.environ.copy()
 ENV["NO_COLOR"] = "1"
@@ -17,8 +16,9 @@ ENV["RUST_BACKTRACE"] = "full"
 
 def process_replay(replay_path, output_folder, carball_path=None, skip_existing=True):
     if carball_path is None:
-        # Use carball.exe in the same directory as this script
-        carball_path = os.path.join(os.path.dirname(__file__), "carball.exe")
+        # Use carball executable in the same directory as this script
+        executable = "carball.exe" if platform.system() == "Windows" else "carball"
+        carball_path = os.path.join(os.path.dirname(__file__), executable)
     folder, fn = os.path.split(replay_path)
     replay_name = fn.replace(".replay", "")
     processed_folder = os.path.join(output_folder, replay_name)
@@ -29,10 +29,16 @@ def process_replay(replay_path, output_folder, carball_path=None, skip_existing=
             os.rmdir(processed_folder)
     os.makedirs(processed_folder, exist_ok=True)
 
+    carball_command = [
+        carball_path, "parquet",
+        "-i", replay_path,
+        "-o", processed_folder,
+    ]
+
     with open(os.path.join(processed_folder, "carball.o.log"), "w", encoding="utf8") as stdout_f:
         with open(os.path.join(processed_folder, "carball.e.log"), "w", encoding="utf8") as stderr_f:
             return subprocess.run(
-                CARBALL_COMMAND.format(carball_path, replay_path, processed_folder),
+                carball_command,
                 stdout=stdout_f,
                 stderr=stderr_f,
                 env=ENV

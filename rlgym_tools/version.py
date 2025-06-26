@@ -5,10 +5,17 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.3.7'
+__version__ = '2.3.8'
 
 
 release_notes = {
+    '2.3.8': """
+    - Add carball executable for linux (automatically picked depending on OS)
+    - Make carball command call more robust
+    - Update carball to support newer replays
+    - Update car bodies list
+    - Small change to GameState serialization to retain order of cars
+    """,
     '2.3.7': """
     - Add car_bodies.py with information about car bodies (id, name, hitbox)
     - Use car id info in replay parsing
