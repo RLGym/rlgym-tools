@@ -5,10 +5,13 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.3.8'
+__version__ = '2.3.9'
 
 
 release_notes = {
+    '2.3.9': """
+    - Update MANIFEST.in to include linux carball executable
+    """,
     '2.3.8': """
     - Add carball executable for linux (automatically picked depending on OS)
     - Make carball command call more robust
