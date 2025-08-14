@@ -1,11 +1,13 @@
 import json
 import os
+import platform
 import subprocess
 import tempfile
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict
-import platform
+import stat
 
 import pandas as pd
 
@@ -13,12 +15,28 @@ ENV = os.environ.copy()
 ENV["NO_COLOR"] = "1"
 ENV["RUST_BACKTRACE"] = "full"
 
+# Use carball executable in the same directory as this script by default
+if platform.system() == "Windows":
+    _default_executable = os.path.join(os.path.dirname(__file__), "carball.exe")
+else:
+    _default_executable = os.path.join(os.path.dirname(__file__), "carball")
+    # Check if we have the needed permissions, and try to update if we don't
+    _st = os.stat(_default_executable)
+    if not _st.st_mode & stat.S_IXUSR:
+        try:
+            os.chmod(_default_executable, _st.st_mode | stat.S_IXUSR)
+        except PermissionError:
+            warnings.warn(
+                f"Could not set executable permissions for {os.path.basename(_default_executable)}. "
+                "Please ensure it is executable by the current user, or specify the path to the carball executable "
+                "using the `carball_path` argument.",
+                UserWarning
+            )
+
 
 def process_replay(replay_path, output_folder, carball_path=None, skip_existing=True):
     if carball_path is None:
-        # Use carball executable in the same directory as this script
-        executable = "carball.exe" if platform.system() == "Windows" else "carball"
-        carball_path = os.path.join(os.path.dirname(__file__), executable)
+        carball_path = _default_executable
     folder, fn = os.path.split(replay_path)
     replay_name = fn.replace(".replay", "")
     processed_folder = os.path.join(output_folder, replay_name)
@@ -37,12 +55,21 @@ def process_replay(replay_path, output_folder, carball_path=None, skip_existing=
 
     with open(os.path.join(processed_folder, "carball.o.log"), "w", encoding="utf8") as stdout_f:
         with open(os.path.join(processed_folder, "carball.e.log"), "w", encoding="utf8") as stderr_f:
-            return subprocess.run(
-                carball_command,
-                stdout=stdout_f,
-                stderr=stderr_f,
-                env=ENV
-            )
+            try:
+                return subprocess.run(
+                    carball_command,
+                    stdout=stdout_f,
+                    stderr=stderr_f,
+                    env=ENV
+                )
+            except PermissionError:
+                os.chmod(carball_path, 0o755)
+                return subprocess.run(
+                    carball_command,
+                    stdout=stdout_f,
+                    stderr=stderr_f,
+                    env=ENV
+                )
 
 
 def load_parquet(*args, **kwargs):

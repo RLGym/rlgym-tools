@@ -9,6 +9,10 @@ __version__ = '2.3.9'
 
 
 release_notes = {
+    '2.3.10': """
+    - Update carball
+    - Attempt to set execute rights for carball on linux
+    """,
     '2.3.9': """
     - Update MANIFEST.in to include linux carball executable
     """,
