@@ -5,7 +5,7 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.3.9'
+__version__ = '2.3.10'
 
 
 release_notes = {
