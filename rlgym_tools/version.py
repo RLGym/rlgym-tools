@@ -5,10 +5,13 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.3.10'
+__version__ = '2.3.11'
 
 
 release_notes = {
+    '2.3.11': """
+    - Update carball
+    """,
     '2.3.10': """
     - Update carball
     - Attempt to set execute rights for carball on linux
