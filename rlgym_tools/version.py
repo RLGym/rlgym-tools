@@ -5,10 +5,12 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.3.12'
-
+__version__ = '2.3.13'
 
 release_notes = {
+    '2.3.13': """
+    - Fix reward calculation for GoalProbReward when gamma<1
+    """,
     '2.3.12': """
     - Update carball
     """,

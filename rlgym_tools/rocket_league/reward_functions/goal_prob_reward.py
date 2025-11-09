@@ -21,6 +21,9 @@ class GoalProbReward(RewardFunction[AgentID, GameState, float]):
         (in fact the paper only deals with finite MDPs with γ=1 and infinite MDPs with γ<1,
         whereas we typically have a finite MDP with γ<1)
 
+        Instead of using the probabilities directly as the potential function,
+        we map them from [0, 1] to [-1, 1], so that the reward is symmetric and consistent with goal/concede rewards.
+
         :param gamma: the discount factor for the reward shaping function.
         """
         self.prob = None
@@ -47,9 +50,8 @@ class GoalProbReward(RewardFunction[AgentID, GameState, float]):
                 prob = 0
         else:
             prob = self.calculate_blue_goal_prob(state)
-        # Probability goes from 0-1, but for a reward we want it to go from -1 to 1
-        # 2x-1 - (2y-1) = 2(x-y)
-        reward = 2 * (self.gamma * prob - self.prob)
+        # Mapping probabilities from [0, 1] to [-1, 1] via 2 * p - 1
+        reward = self.gamma * (2 * prob - 1) - (2 * self.prob - 1)
         rewards = {
             agent: reward if state.cars[agent].is_blue else -reward
             for agent in agents
