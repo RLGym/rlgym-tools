@@ -5,9 +5,14 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.3.13'
+__version__ = '2.4.0'
 
 release_notes = {
+    '2.4.0': """
+    - Split VelocityPlayerToBallReward into different reward functions instead of using parameters:
+      VelocityPlayerToBallReward, DotQuotientVPBReward, TrajectoryComparisonVPBReward
+    - Redo parameters in BallTravelReward to make them clearer
+    """,
     '2.3.13': """
     - Fix reward calculation for GoalProbReward when gamma<1
     """,

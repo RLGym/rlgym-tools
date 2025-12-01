@@ -2,65 +2,81 @@ from typing import Any, Dict, List
 
 import numpy as np
 from rlgym.api import RewardFunction, AgentID
-from rlgym.rocket_league.api import GameState
+from rlgym.rocket_league.api import GameState, PhysicsObject
 from rlgym.rocket_league.common_values import CAR_MAX_SPEED, BALL_MAX_SPEED, SIDE_WALL_X, BACK_WALL_Y, CEILING_Z, \
     BALL_RADIUS
 
 
 class VelocityPlayerToBallReward(RewardFunction[AgentID, GameState, float]):
-    def __init__(self, include_negative_values: bool = True, use_trajectory_comparison: bool = False,
-                 use_dot_quotient: bool = False):
+    def __init__(self, include_negative_values: bool = True):
         self.include_negative_values = include_negative_values
-        self.use_trajectory_comparison = use_trajectory_comparison
-        self.use_dot_quotient = use_dot_quotient
 
     def reset(self, agents: List[AgentID], initial_state: GameState, shared_info: Dict[str, Any]) -> None:
         pass
 
     def get_rewards(self, agents: List[AgentID], state: GameState, is_terminated: Dict[AgentID, bool],
                     is_truncated: Dict[AgentID, bool], shared_info: Dict[str, Any]) -> Dict[AgentID, float]:
-        return {agent: self._get_reward(agent, state) for agent in agents}
-
-    def _get_reward(self, agent: AgentID, state: GameState):
+        rewards = {}
         ball = state.ball
-        car = state.cars[agent].physics
-        if self.use_trajectory_comparison:
-            curr_dist, min_dist, t = trajectory_comparison(car.position, car.linear_velocity,
-                                                           ball.position, ball.linear_velocity)
-            vel = (curr_dist - min_dist) / t if t != 0 else 0
-            norm_vel = vel / (CAR_MAX_SPEED + BALL_MAX_SPEED)
-            if abs(norm_vel) > 1:  # In case of floating point errors with small t
-                norm_vel = np.sign(norm_vel)
-        elif self.use_dot_quotient:
-            car_to_ball = ball.position - car.position
-            car_to_ball = car_to_ball / np.linalg.norm(car_to_ball)
+        for agent in agents:
+            car = state.cars[agent].physics
 
-            # Vector version of v=d/t <=> t=d/v <=> 1/t=v/d which becomes v . d / |d|^2
-            # Max value should be max_speed / ball_radius = 2300 / 92.75 = 24.8
-            vd = np.dot(car_to_ball, car.linear_velocity)
-            dd = np.dot(car_to_ball, ball.linear_velocity)
-            inv_time = vd / dd if dd != 0 else 0
-            norm_vel = inv_time / (CAR_MAX_SPEED / BALL_RADIUS)
-        else:
-            car_to_ball = ball.position - car.position
-            car_to_ball = car_to_ball / np.linalg.norm(car_to_ball)
+            reward = self._get_reward(car, ball)
+            if self.include_negative_values:
+                rewards[agent] = reward
+            else:
+                rewards[agent] = max(0, reward)
+        return rewards
 
-            vel = np.dot(car_to_ball, car.linear_velocity)
-            norm_vel = vel / CAR_MAX_SPEED
-        if self.include_negative_values:
-            return norm_vel
-        return max(0, norm_vel)
+    def _get_reward(self, car: PhysicsObject, ball: PhysicsObject):
+        car_to_ball = ball.position - car.position
+        car_to_ball = car_to_ball / np.linalg.norm(car_to_ball)  # Normalize
+
+        vel = np.dot(car_to_ball, car.linear_velocity)
+        norm_vel = vel / CAR_MAX_SPEED
+        return norm_vel
 
 
-def trajectory_comparison(pos1, vel1, pos2, vel2, check_bounds=True):
+class DotQuotientVPBReward(VelocityPlayerToBallReward):
+    def _get_reward(self, car: PhysicsObject, ball: PhysicsObject):
+        car_to_ball = ball.position - car.position
+        car_to_ball = car_to_ball / np.linalg.norm(car_to_ball)
+
+        # Vector version of v=d/t <=> t=d/v <=> 1/t=v/d which becomes v . d / |d|^2
+        # Max value should be max_speed / ball_radius = 2300 / 92.75 = 24.8
+        vd = np.dot(car_to_ball, car.linear_velocity)
+        dd = np.dot(car_to_ball, ball.linear_velocity)
+        inv_time = vd / dd if dd != 0 else 0
+        norm_vel = inv_time / (CAR_MAX_SPEED / BALL_RADIUS)
+        return norm_vel
+
+
+class TrajectoryComparisonVPBReward(VelocityPlayerToBallReward):
+    def _get_reward(self, car: PhysicsObject, ball: PhysicsObject):
+        curr_dist, min_dist, t = trajectory_comparison(car.position, car.linear_velocity,
+                                                       ball.position, ball.linear_velocity)
+        vel = (curr_dist - min_dist) / t if t != 0 else 0
+        norm_vel = vel / (CAR_MAX_SPEED + BALL_MAX_SPEED)
+        if abs(norm_vel) > 1:  # In case of floating point errors with small t
+            norm_vel = np.sign(norm_vel)
+        return norm_vel
+
+
+def trajectory_comparison(
+        pos1: np.ndarray,
+        vel1: np.ndarray,
+        pos2: np.ndarray,
+        vel2: np.ndarray,
+        check_bounds: bool = True
+) -> tuple[float, float, float]:
     """
     Calculate the closest point between two trajectories, defined as the lines:
       pos1 + t * vel1
       pos2 + t * vel2
     """
     # First, find max time based on field bounds
+    max_time = np.inf
     if check_bounds:
-        max_time = np.inf
         for pos, vel in (pos1, vel1), (pos2, vel2):
             bounds = np.array([[-SIDE_WALL_X, -BACK_WALL_Y, 0],
                                [SIDE_WALL_X, BACK_WALL_Y, CEILING_Z]])
@@ -94,4 +110,4 @@ def trajectory_comparison(pos1, vel1, pos2, vel2, check_bounds=True):
     curr_dist = np.linalg.norm(pos_diff)
     min_dist = np.linalg.norm(pos_diff + t * vel_diff)
 
-    return curr_dist, min_dist, t
+    return float(curr_dist), float(min_dist), float(t)
