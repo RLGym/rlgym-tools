@@ -4,28 +4,36 @@ import numpy as np
 from rlgym.api import RewardFunction, AgentID
 from rlgym.rocket_league.api import GameState, PhysicsObject
 from rlgym.rocket_league.common_values import CAR_MAX_SPEED, BALL_MAX_SPEED, SIDE_WALL_X, BACK_WALL_Y, CEILING_Z, \
-    BALL_RADIUS
+    BALL_RADIUS, TICKS_PER_SECOND
 
 
 class VelocityPlayerToBallReward(RewardFunction[AgentID, GameState, float]):
+    """
+    Rewards the agent based on its velocity towards the ball.
+    The reward is normalized such that at max speed towards the ball, the agent receives 1.0 reward per second.
+    If moving away from the ball, the agent receives negative reward, unless `include_negative_values` is set to False.
+    """
     def __init__(self, include_negative_values: bool = True):
         self.include_negative_values = include_negative_values
+        self.prev_state = None
 
     def reset(self, agents: List[AgentID], initial_state: GameState, shared_info: Dict[str, Any]) -> None:
-        pass
+        self.prev_state = initial_state
 
     def get_rewards(self, agents: List[AgentID], state: GameState, is_terminated: Dict[AgentID, bool],
                     is_truncated: Dict[AgentID, bool], shared_info: Dict[str, Any]) -> Dict[AgentID, float]:
+        dt = (state.tick_count - self.prev_state.tick_count) / TICKS_PER_SECOND
         rewards = {}
         ball = state.ball
         for agent in agents:
             car = state.cars[agent].physics
 
-            reward = self._get_reward(car, ball)
+            reward = self._get_reward(car, ball) * dt
             if self.include_negative_values:
                 rewards[agent] = reward
             else:
                 rewards[agent] = max(0, reward)
+        self.prev_state = state
         return rewards
 
     def _get_reward(self, car: PhysicsObject, ball: PhysicsObject):

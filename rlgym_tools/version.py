@@ -5,9 +5,16 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.4.0'
+__version__ = '2.5.0'
 
 release_notes = {
+    '2.5.0': """
+    - VelocityPlayerToBallReward is now normalized to give 1 reward per second at max speed instead of 1 per step.
+    - Refactor BallTravelReward:
+      - All weights now default to 0.
+      - Last_touch_agent is now a list called last_touch_agents. 
+      - Rewards are averaged between agents touching last step and agents touching this step.
+    """,
     '2.4.0': """
     - Split VelocityPlayerToBallReward into different reward functions instead of using parameters:
       VelocityPlayerToBallReward, DotQuotientVPBReward, TrajectoryComparisonVPBReward

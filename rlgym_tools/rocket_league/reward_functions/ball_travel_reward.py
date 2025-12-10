@@ -9,14 +9,13 @@ from rlgym.rocket_league.math import euclidean_distance
 class BallTravelReward(RewardFunction[AgentID, GameState, float]):
     def __init__(
             self,
-            self_to_self_weight=1.0,
-            self_to_tm8_weight=1.0,
-            tm8_to_self_weight=1.0,
-            self_to_opp_weight=-1.0,
-            opp_to_self_weight=1.0,
-            self_to_opp_goal_weight=1.0,
-            self_to_own_goal_weight=-1.0,
-            invalidate_last_touch_on_demo=True,
+            self_to_self_weight=0.0,
+            self_to_tm8_weight=0.0,
+            tm8_to_self_weight=0.0,
+            self_to_opp_weight=-0.0,
+            opp_to_self_weight=0.0,
+            self_to_opp_goal_weight=0.0,
+            self_to_own_goal_weight=-0.0,
             do_integral=False,
             distance_normalization=None,
     ):
@@ -34,6 +33,14 @@ class BallTravelReward(RewardFunction[AgentID, GameState, float]):
                                        or area of half field length by half ceiling height if do_integral is True.
         :param do_integral: Whether to calculate the area under the ball's travel curve instead of the distance.
         """
+        assert (self_to_self_weight != 0
+                or self_to_tm8_weight != 0
+                or tm8_to_self_weight != 0
+                or self_to_opp_weight != 0
+                or opp_to_self_weight != 0
+                or self_to_opp_goal_weight != 0
+                or self_to_own_goal_weight != 0), "At least one weight must be non-zero."
+
         self.self_to_self_weight = self_to_self_weight
         self.self_to_tm8_weight = self_to_tm8_weight
         self.tm8_to_self_weight = tm8_to_self_weight
@@ -41,7 +48,6 @@ class BallTravelReward(RewardFunction[AgentID, GameState, float]):
         self.opp_to_self_weight = opp_to_self_weight
         self.self_to_opp_goal_weight = self_to_opp_goal_weight
         self.self_to_own_goal_weight = self_to_own_goal_weight
-        self.invalidate_last_touch_on_demo = invalidate_last_touch_on_demo
 
         if distance_normalization is None:
             if do_integral:
@@ -54,26 +60,12 @@ class BallTravelReward(RewardFunction[AgentID, GameState, float]):
         self.do_integral = do_integral
 
         self.prev_ball_pos = None
-        self.last_touch_agent = None
+        self.last_touch_agents = None
         self.distance_since_touch = 0
 
     def reset(self, agents: List[AgentID], initial_state: GameState, shared_info: Dict[str, Any]) -> None:
         self.prev_ball_pos = initial_state.ball.position
-        self.last_touch_agent = None
-        for agent in initial_state.cars:
-            if initial_state.cars[agent].ball_touches > 0:
-                if self.last_touch_agent is not None:
-                    ad = euclidean_distance(
-                        initial_state.cars[agent].physics.position,
-                        initial_state.ball.position
-                    )
-                    ltd = euclidean_distance(
-                        initial_state.cars[self.last_touch_agent].physics.position,
-                        initial_state.ball.position
-                    )
-                    if ltd < ad:
-                        continue
-                self.last_touch_agent = agent
+        self.last_touch_agents = [agent for agent in agents if initial_state.cars[agent].ball_touches > 0]
         self.distance_since_touch = 0
 
     def get_rewards(self, agents: List[AgentID], state: GameState, is_terminated: Dict[AgentID, bool],
@@ -90,52 +82,51 @@ class BallTravelReward(RewardFunction[AgentID, GameState, float]):
         self.prev_ball_pos = ball_pos
         self.distance_since_touch += distance
 
+        # This list is to remove dependence on agent order
+        touching_agents = [agent for agent in state.cars if state.cars[agent].ball_touches > 0]
+
         # Assign rewards based on the ball touches
         rewards = {k: 0.0 for k in state.cars}
-        touching_agents = []  # This list is to remove dependence on agent order
-        for agent in state.cars:
-            car = state.cars[agent]
-            if car.ball_touches > 0:
-                if self.last_touch_agent is not None:
+        for a1 in self.last_touch_agents:
+            for a2 in touching_agents:
+                if a1 == a2:
+                    # Same agent touched the ball again
                     norm_dist = self.distance_since_touch * self.normalization_factor
-                    if agent == self.last_touch_agent:
-                        # Consecutive touches
-                        rewards[agent] += norm_dist * self.self_to_self_weight
-                    elif car.team_num == state.cars[self.last_touch_agent].team_num:
-                        # Pass to teammate
-                        rewards[agent] += norm_dist * self.tm8_to_self_weight
-                        rewards[self.last_touch_agent] += norm_dist * self.self_to_tm8_weight
-                    else:
-                        # Team change
-                        rewards[agent] += norm_dist * self.opp_to_self_weight
-                        rewards[self.last_touch_agent] += norm_dist * self.self_to_opp_weight
-                touching_agents.append(agent)
-            elif car.is_demoed and self.last_touch_agent == agent and self.invalidate_last_touch_on_demo:
-                self.last_touch_agent = None
+                    rewards[a1] += norm_dist * self.self_to_self_weight
+                elif state.cars[a1].team_num == state.cars[a2].team_num:
+                    # Teammate touch
+                    norm_dist = self.distance_since_touch * self.normalization_factor
+                    rewards[a1] += norm_dist * self.self_to_tm8_weight
+                    rewards[a2] += norm_dist * self.tm8_to_self_weight
+                else:
+                    # Opponent touch
+                    norm_dist = self.distance_since_touch * self.normalization_factor
+                    rewards[a1] += norm_dist * self.self_to_opp_weight
+                    rewards[a2] += norm_dist * self.opp_to_self_weight
 
-        if state.goal_scored and self.last_touch_agent is not None:
+        # Goal scored rewards
+        if state.goal_scored:
             team = state.scoring_team
             norm_dist = self.distance_since_touch * self.normalization_factor
-            if team == state.cars[self.last_touch_agent].team_num:
-                rewards[self.last_touch_agent] += norm_dist * self.self_to_opp_goal_weight
-            else:
-                rewards[self.last_touch_agent] += norm_dist * self.self_to_own_goal_weight
+            for lta in self.last_touch_agents:
+                if team == state.cars[lta].team_num:
+                    rewards[lta] += norm_dist * self.self_to_opp_goal_weight
+                else:
+                    rewards[lta] += norm_dist * self.self_to_own_goal_weight
 
         if len(touching_agents) > 0:
-            self.distance_since_touch = 0
-            # Update the last touch agent
-            if len(touching_agents) == 1:
-                self.last_touch_agent = touching_agents[0]
-            else:
+            norm_factor = len(touching_agents) * len(self.last_touch_agents)
+
+            if norm_factor > 1:
                 # If multiple agents touch the ball in the same step, adjust rewards
                 for agent in state.cars:
-                    rewards[agent] /= len(touching_agents)
-                # and set last touch to be the one that is closest to the ball
-                closest_agent = min(touching_agents,
-                                    key=lambda x: euclidean_distance(state.cars[x].physics.position, ball_pos))
-                self.last_touch_agent = closest_agent
+                    rewards[agent] /= norm_factor
 
-        shared_info["last_touch_agent"] = self.last_touch_agent
+            # Update the last touch agents
+            self.last_touch_agents = touching_agents
+            self.distance_since_touch = 0
+
+        shared_info["last_touch_agents"] = self.last_touch_agents
         shared_info["distance_since_touch"] = self.distance_since_touch
 
         # Only return rewards for the requested agents
