@@ -5,9 +5,13 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.5.0'
+__version__ = '2.6.0'
 
 release_notes = {
+    '2.6.0': """
+    - Replace TeamSpiritRewardWrapper with more configurable DistributeRewardsWrapper
+    - Fix RewardReport not tracking episode ends automatically
+    """,
     '2.5.0': """
     - VelocityPlayerToBallReward is now normalized to give 1 reward per second at max speed instead of 1 per step.
     - Refactor BallTravelReward:

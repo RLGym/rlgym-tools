@@ -38,6 +38,7 @@ def get_reward_df(replay: ParsedReplay, reward_functions: List[Tuple[RewardFunct
     data = {
         "game_time": [],
         "frame_number": [],
+        "is_goal": [],
         **{
             f"{player_name}/{reward_name}": []
             for reward_name in reward_functions.keys()
@@ -73,6 +74,7 @@ def get_reward_df(replay: ParsedReplay, reward_functions: List[Tuple[RewardFunct
         else:
             data["game_time"].append(timer)
         data["frame_number"].append(frame_number)
+        data["is_goal"].append(replay_frame.state.goal_scored)
 
         if shared_info_provider is not None:
             shared_info_provider.step(agent_ids, game_state, shared_info)
@@ -85,7 +87,7 @@ def get_reward_df(replay: ParsedReplay, reward_functions: List[Tuple[RewardFunct
 
     data = pd.DataFrame(data)
 
-    meta = data[['game_time', 'frame_number']]
+    meta = data[['game_time', 'frame_number', 'is_goal']].copy()
     multicol = data.loc[:, data.columns.str.contains("/")]
     # Make columns multiindex (player_name, reward_name)
     multicol.columns = pd.MultiIndex.from_tuples(
@@ -190,7 +192,7 @@ def generate_plot(meta_df, reward_df, gamma=None):
                             ncols=len(reward_df.columns.levels[0]),
                             figsize=(10 * len(reward_df.columns.levels[0]), 5 * len(reward_df.columns.levels[1])),
                             sharey="row")
-    goals = np.where(reward_df[reward_df.columns.levels[0][0], "EpisodeEnd"] != 0)[0]
+    goals = meta_df.index[meta_df["is_goal"]].to_numpy()
     edges = sorted(set([0] + (goals + 1).tolist() + [len(xs)]))
     for i, player in enumerate(reward_df.columns.levels[0]):
         for j, reward in enumerate(reward_df.columns.levels[1]):
@@ -214,6 +216,7 @@ def generate_plot(meta_df, reward_df, gamma=None):
             # Invert x-axis for time
             ax.invert_xaxis()
             ax.set_xlabel("Time (s)")
+            ax.set_xticks(np.arange(0, xs.max() + 1, step=30))
 
             # Make secondary x-axis tick labels that show mm:ss
             a_sec = ax.secondary_xaxis("top")

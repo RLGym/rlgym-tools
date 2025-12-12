@@ -16,7 +16,7 @@ from rlgym_tools.rocket_league.reward_functions.boost_keep_reward import BoostKe
 from rlgym_tools.rocket_league.reward_functions.demo_reward import DemoReward
 from rlgym_tools.rocket_league.reward_functions.flip_reset_reward import FlipResetReward
 from rlgym_tools.rocket_league.reward_functions.goal_prob_reward import GoalViewReward
-from rlgym_tools.rocket_league.reward_functions.team_spirit_reward_wrapper import TeamSpiritRewardWrapper
+from rlgym_tools.rocket_league.reward_functions.distribute_rewards_wrapper import DistributeRewardsWrapper
 from rlgym_tools.rocket_league.reward_functions.velocity_player_to_ball_reward import VelocityPlayerToBallReward, \
     TrajectoryComparisonVPBReward
 from rlgym_tools.rocket_league.reward_functions.wavedash_reward import WavedashReward
@@ -68,7 +68,7 @@ def main():
     ]
     # Add zero-sum versions
     rewards_list += [
-        (TeamSpiritRewardWrapper(copy.deepcopy(r), 0.0), t + "_zero_sum")
+        (DistributeRewardsWrapper(copy.deepcopy(r), selflessness=0.0), t + "_zero_sum")
         for r, t in rewards_list
     ]
 

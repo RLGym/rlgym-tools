@@ -23,7 +23,7 @@ from rlgym_tools.rocket_league.reward_functions.demo_reward import DemoReward
 from rlgym_tools.rocket_league.reward_functions.flip_reset_reward import FlipResetReward
 from rlgym_tools.rocket_league.reward_functions.goal_prob_reward import GoalViewReward
 from rlgym_tools.rocket_league.reward_functions.stack_reward import StackReward
-from rlgym_tools.rocket_league.reward_functions.team_spirit_reward_wrapper import TeamSpiritRewardWrapper
+from rlgym_tools.rocket_league.reward_functions.distribute_rewards_wrapper import DistributeRewardsWrapper
 from rlgym_tools.rocket_league.reward_functions.velocity_player_to_ball_reward import VelocityPlayerToBallReward
 from rlgym_tools.rocket_league.shared_info_providers.ball_prediction_provider import BallPredictionProvider
 from rlgym_tools.rocket_league.shared_info_providers.multi_provider import MultiProvider
@@ -83,7 +83,9 @@ def main():
                 delay_ticks=tick_skip - 1,
             ),
         ),
-        reward_fn=TeamSpiritRewardWrapper(StackReward(rewards), team_spirit=0.5),
+        reward_fn=DistributeRewardsWrapper(StackReward(rewards),
+                                           selflessness=0.5,
+                                           agg_method=lambda x: np.mean(x, axis=0)),  # Support numpy arrays
         transition_engine=RocketSimEngine(),
         termination_cond=GameCondition(seconds_per_goal_forfeit=10, max_overtime_seconds=300),
         truncation_cond=NoTouchTimeoutCondition(timeout_seconds=60),
