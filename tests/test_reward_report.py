@@ -16,7 +16,7 @@ from rlgym_tools.rocket_league.reward_functions.boost_keep_reward import BoostKe
 from rlgym_tools.rocket_league.reward_functions.demo_reward import DemoReward
 from rlgym_tools.rocket_league.reward_functions.flip_reset_reward import FlipResetReward
 from rlgym_tools.rocket_league.reward_functions.goal_prob_reward import GoalViewReward
-from rlgym_tools.rocket_league.reward_functions.distribute_rewards_wrapper import DistributeRewardsWrapper
+from rlgym_tools.rocket_league.reward_functions.wrappers.distribute_rewards_wrapper import DistributeRewardsWrapper
 from rlgym_tools.rocket_league.reward_functions.velocity_player_to_ball_reward import VelocityPlayerToBallReward, \
     TrajectoryComparisonVPBReward
 from rlgym_tools.rocket_league.reward_functions.wavedash_reward import WavedashReward

@@ -5,9 +5,13 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.6.0'
+__version__ = '2.7.0'
 
 release_notes = {
+    '2.7.0': """
+    - Add a `WeightedWrapper` to easily weight rewards from outside the reward function
+    - Add a chainable wrapper class to ease the use of wrappers such as `DistributeRewardsWrapper` or `WeightedWrapper`
+    """,
     '2.6.0': """
     - Replace TeamSpiritRewardWrapper with more configurable DistributeRewardsWrapper
     - Fix RewardReport not tracking episode ends automatically
