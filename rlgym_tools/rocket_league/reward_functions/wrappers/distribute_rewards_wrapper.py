@@ -4,8 +4,10 @@ from typing import Any, Dict, List, Callable
 from rlgym.api import RewardFunction, AgentID
 from rlgym.rocket_league.api import GameState
 
+from rlgym_tools.rocket_league.reward_functions.wrappers.base_wrapper import BaseWrapper
 
-class DistributeRewardsWrapper(RewardFunction[AgentID, GameState, float]):
+
+class DistributeRewardsWrapper(BaseWrapper):
     """
     Implements a reward distribution scheme.
     It is mainly inspired the distribution scheme described in the OpenAI Five paper (Berner et al., 2019).
@@ -38,19 +40,16 @@ class DistributeRewardsWrapper(RewardFunction[AgentID, GameState, float]):
             opp_coef: float = None,  # Defaults to 1 - team_coef
             agg_method: Callable[[list[float]], float] = fmean,
     ):
-        self.reward_fn = reward_fn
+        super().__init__(reward_function=reward_fn)
         self.selflessness = selflessness
         self.selfishness = selfishness if selfishness is not None else (1 - selflessness)
         self.team_coef = team_coef
         self.opp_coef = opp_coef if opp_coef is not None else (1 - team_coef)
         self.agg_method = agg_method
 
-    def reset(self, agents: List[AgentID], initial_state: GameState, shared_info: Dict[str, Any]) -> None:
-        self.reward_fn.reset(agents, initial_state, shared_info)
-
     def get_rewards(self, agents: List[AgentID], state: GameState, is_terminated: Dict[AgentID, bool],
                     is_truncated: Dict[AgentID, bool], shared_info: Dict[str, Any]) -> Dict[AgentID, float]:
-        base_rewards = self.reward_fn.get_rewards(
+        base_rewards = super().get_rewards(
             list(state.cars.keys()), state, is_terminated, is_truncated, shared_info
         )
 

@@ -23,7 +23,8 @@ from rlgym_tools.rocket_league.reward_functions.demo_reward import DemoReward
 from rlgym_tools.rocket_league.reward_functions.flip_reset_reward import FlipResetReward
 from rlgym_tools.rocket_league.reward_functions.goal_prob_reward import GoalViewReward
 from rlgym_tools.rocket_league.reward_functions.stack_reward import StackReward
-from rlgym_tools.rocket_league.reward_functions.distribute_rewards_wrapper import DistributeRewardsWrapper
+from rlgym_tools.rocket_league.reward_functions.wrappers.chain_wrapper import ChainWrapper
+from rlgym_tools.rocket_league.reward_functions.wrappers.distribute_rewards_wrapper import DistributeRewardsWrapper
 from rlgym_tools.rocket_league.reward_functions.velocity_player_to_ball_reward import VelocityPlayerToBallReward
 from rlgym_tools.rocket_league.shared_info_providers.ball_prediction_provider import BallPredictionProvider
 from rlgym_tools.rocket_league.shared_info_providers.multi_provider import MultiProvider
@@ -56,8 +57,9 @@ def main():
                DemoReward(),
                FlipResetReward(),
                GoalViewReward(),
-               VelocityPlayerToBallReward()]
-    reward_weights = [20, 1, 5, 10, 10, tick_skip / TICKS_PER_SECOND]
+               VelocityPlayerToBallReward(),
+               ChainWrapper(VelocityPlayerToBallReward()).distribute_rewards().weight(3.0)
+               ]
     env = RLGym(
         state_mutator=MutatorSequence(
             ConfigMutator(boost_consumption=0.1),
