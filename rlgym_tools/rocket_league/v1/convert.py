@@ -4,11 +4,15 @@ from rlgym.rocket_league.api import Car, PhysicsObject, GameState
 from rlgym.rocket_league.common_values import BLUE_TEAM
 
 from rlgym_tools.rocket_league.v1 import V1PhysicsObject, V1PlayerData, V1GameState
+from rlgym.rocket_league.math import rotation_to_quaternion
 
 
 def convert_physics_object(po: PhysicsObject, copy: bool = True) -> V1PhysicsObject:
     pos = po.position
-    quat = po.quaternion
+    try:
+        quat = po.quaternion
+    except NotImplementedError:
+        quat = rotation_to_quaternion(po.rotation_mtx)
     lin_vel = po.linear_velocity
     ang_vel = po.angular_velocity
 
