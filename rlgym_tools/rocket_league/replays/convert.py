@@ -356,6 +356,8 @@ def _prepare_segment_dfs(replay, start_frame, end_frame, linear_interpolation, p
              & (pdf["jump_is_active"] == 1))
         pdf.loc[m, "jump_is_active"] = 0
 
+        pdf["got_flip_reset"] = pdf["dodges_refreshed_counter"].diff() > 0
+
         times = game_df["time"].copy()
         times[is_repeat] = np.nan
         times = times.ffill().fillna(0.)
@@ -446,6 +448,14 @@ def _update_car_and_get_action(car: Car, linear_interpolation: bool, player_row,
     yaw = player_row.yaw
     roll = player_row.roll
     jump = 0
+
+    if player_row.got_flip_reset and not car.on_ground and not car.has_flip:
+        # on_ground means RocketSim detected the reset, but it should have an infinite flip if not
+        car.has_jumped = False
+        car.has_double_jumped = False
+        car.has_flipped = False
+        car.air_time_since_jump = 0
+        car.flip_time = 0
 
     if player_row.dodged or player_row.double_jumped:
         # Make sure the car is in a valid state for dodging/double jumping
