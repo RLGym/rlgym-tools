@@ -5,9 +5,13 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.6.1'
+__version__ = '2.6.2'
 
 release_notes = {
+    '2.6.2': """
+    - Add training pack mutator
+    - Add scripts for making training pack states and visualizing them
+    """,
     '2.6.1': """
     - Update carball to support latest replay format changes
     - Update convert.py to use new flip reset packet data
