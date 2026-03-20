@@ -24,8 +24,9 @@ def main():
     # paths = glob.glob(r"./test_replays/2e786f1b-d3a1-4e51-9e7a-b45e80b10abb.replay")
     # paths = glob.glob(r"./test_replays/1168d253-8deb-4454-afba-cb6b09d7b3fc.replay")
     # paths = glob.glob(r"./test_replays/6414a7ae-0e30-4e0d-8fe6-6769ec540852.replay")
-    paths = glob.glob(r"./test_replays/36d77ff2-49b8-42e8-9012-c238f0295e31.replay")
-    paths = glob.glob(r"./test_replays/bb772d09-5d6f-4174-8d57-b0f6853e1638.replay")
+    # paths = glob.glob(r"./test_replays/36d77ff2-49b8-42e8-9012-c238f0295e31.replay")
+    # paths = glob.glob(r"./test_replays/bb772d09-5d6f-4174-8d57-b0f6853e1638.replay")
+    paths = glob.glob(r"./test_replays/*.replay")
     random.shuffle(paths)
     forfeits = {}
     # lookup_table = AdvancedLookupTableAction.make_lookup_table(torque_bins=5,

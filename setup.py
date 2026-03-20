@@ -29,6 +29,8 @@ setup(
         'Programming Language :: Python :: 3',
         "Operating System :: OS Independent",
     ],
-    package_data={'rlgym_tools': ['rocket_league/replays/carball.exe', 'rocket_league/replays/carball']},
+    package_data={'rlgym_tools': ['rocket_league/replays/carball.exe',
+                                  'rocket_league/replays/carball',
+                                  'rocket_league/state_mutators/training_pack_states.jsonl.gz']},
     include_package_data=True,  # For MANIFEST.in
 )

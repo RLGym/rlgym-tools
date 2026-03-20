@@ -1,2 +1,3 @@
 include rlgym_tools/rocket_league/replays/carball.exe
 include rlgym_tools/rocket_league/replays/carball
+include rlgym_tools/rocket_league/state_mutators/training_pack_states.jsonl.gz
