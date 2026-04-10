@@ -227,7 +227,7 @@ def replay_to_rlgym(
                     pad_dists = np.linalg.norm(_boost_locations - state.cars[uid].physics.position, axis=1)
                     closest_pad_idx = np.argmin(pad_dists)
                     if pad_dists[closest_pad_idx] < 200 and state.boost_pad_timers[closest_pad_idx] == 0:
-                        if _boost_locations[closest_pad_idx, 1] > 71.5:
+                        if _boost_locations[closest_pad_idx, 2] > 71.5:
                             state.boost_pad_timers[closest_pad_idx] = BIG_PAD_RECHARGE_SECONDS
                         else:
                             state.boost_pad_timers[closest_pad_idx] = SMALL_PAD_RECHARGE_SECONDS
