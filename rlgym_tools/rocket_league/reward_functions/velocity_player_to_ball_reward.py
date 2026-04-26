@@ -2,9 +2,8 @@ from typing import Any, Dict, List
 
 import numpy as np
 from rlgym.api import RewardFunction, AgentID
-from rlgym.rocket_league.api import GameState, PhysicsObject
-from rlgym.rocket_league.common_values import CAR_MAX_SPEED, BALL_MAX_SPEED, SIDE_WALL_X, BACK_WALL_Y, CEILING_Z, \
-    BALL_RADIUS, TICKS_PER_SECOND
+from rlgym.rocket_league.api import, PhysicsObject
+from rlgym_compat import GameState, common_values
 
 
 class VelocityPlayerToBallReward(RewardFunction[AgentID, GameState, float]):
