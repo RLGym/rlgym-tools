@@ -5,11 +5,17 @@
 # 3) we can import it into your module module
 # https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
 
-__version__ = '2.6.3'
+__version__ = '2.6.5'
 
 release_notes = {
-    '2.6.3': """
+    '2.6.5': """
     - Update carball
+    """,
+    '2.6.4': """
+    - Fix check for big boost pad in replay to RLGym converter
+    """,
+    '2.6.3': """
+    - Make normalization safe from division by 0 in dodge_relative_rot_mtx
     """,
     '2.6.2': """
     - Add training pack mutator

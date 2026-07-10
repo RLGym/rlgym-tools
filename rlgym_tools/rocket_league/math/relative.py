@@ -20,7 +20,12 @@ def relative_physics(origin: PhysicsObject, targets: List[PhysicsObject]) -> Lis
 def dodge_relative_rot_mtx(rot_mtx: np.ndarray) -> np.ndarray:
     modified_rot = np.zeros_like(rot_mtx)
     fw = rot_mtx[:2, 0]
-    modified_rot[:2, 0] = fw / np.linalg.norm(fw)  # Renormalize forward
+    norm = np.linalg.norm(fw)
+    # Renormalize forward (safely)
+    if norm > 1e-8:
+        modified_rot[:2, 0] = fw / norm
+    else:
+        modified_rot[0, 0] = 1.0  # Retain valid forward direction
     modified_rot[0, 1] = -modified_rot[1, 0]  # Recalculate right vector
     modified_rot[1, 1] = modified_rot[0, 0]  # --||--
     modified_rot[2, 2] = 1  # Set z axis to be up
