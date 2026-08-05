@@ -1,4 +1,4 @@
-from typing import Generator
+from typing import Generator, Dict, Any
 
 from rlgym.rocket_league.api import Car, PhysicsObject, GameState
 from rlgym.rocket_league.common_values import BLUE_TEAM
@@ -138,3 +138,39 @@ def convert_game_states(copy: bool = True) -> Generator[GameState, V1GameState, 
         v1_state.orange_score = orange_goals
 
         yield v1_state
+
+
+def create_car_id_map(cars: Dict[Any, Any]) -> Dict[int, Any]:
+    # Creates a mapping from v1 car_id and v2 agent_id.
+    # This replicates the ID assignment logic in convert_game_state to allow mapping between v1 car_id and v2 agent_id.
+    # Useful if you're converting replays to v1 and want to know which v2 agent each player corresponds to for actions.
+    # Usage:
+    # id_map = create_car_id_map(state.cars)
+    # v2_id = id_map[v1_player.car_id]
+
+    # Sort cars by UUID
+    sorted_cars = sorted(cars.items(), key=lambda x: x[0])
+    
+    # Separate into blue and orange teams
+    blue_cars = [(uuid, car) for uuid, car in sorted_cars if car.team_num == BLUE_TEAM]
+    orange_cars = [(uuid, car) for uuid, car in sorted_cars if car.team_num != BLUE_TEAM]
+    
+    # Determine starting indices for v1 IDs
+    blue_start_index = 1
+    if len(blue_cars) <= 4 and len(orange_cars) <= 4:
+        orange_start_index = 5
+    else:
+        orange_start_index = len(blue_cars) + 1
+    
+    # Build the map
+    id_map = {}
+    # Blue team
+    for i, (uuid, car) in enumerate(blue_cars):
+        v1_id = blue_start_index + i
+        id_map[v1_id] = uuid
+    # Orange team
+    for i, (uuid, car) in enumerate(orange_cars):
+        v1_id = orange_start_index + i
+        id_map[v1_id] = uuid
+    
+    return id_map
